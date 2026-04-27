@@ -446,19 +446,40 @@ function drawQuoteSheet(doc: jsPDF, elevation: Elevation, job: Job, x: number, y
     ["Job", `${job.number || "-"} ${job.name || ""}`.trim()],
     ["Customer", job.customer || "-"],
     ["Elevation", elevation.name],
-    ["Opening area", `${formatSquareFeet(quote.openingSquareFeet)} sq ft @ ${formatCurrency(quote.installedRatePerSquareFoot)} / sq ft`],
-    ["Installed storefront", formatCurrency(quote.installedCost)],
-    ["Single doors", `${quote.singleDoorCount} @ ${formatCurrency(quote.singleDoorPrice)}`],
-    ["Pair doors", `${quote.pairDoorCount} @ ${formatCurrency(quote.pairDoorPrice)}`],
-    ["Door total", formatCurrency(quote.doorCost)]
+    ["Interior storefront", `${formatSquareFeet(quote.quotedStorefrontSquareFeet)} sq ft @ ${formatCurrency(quote.installedRatePerSquareFoot)} / sq ft`],
+    ["Installed storefront", formatCurrency(quote.installedCost)]
   ];
+
+  if (quote.doorOpeningSquareFeet > 0) {
+    rows.splice(4, 0, ["Door opening excluded", `${formatSquareFeet(quote.doorOpeningSquareFeet)} sq ft`]);
+  }
+
+  if (quote.highHeavyGlassSquareFeet > 0) {
+    rows.push([
+      "High/heavy glass premium",
+      `${formatSquareFeet(quote.highHeavyGlassSquareFeet)} sq ft @ +${formatCurrency(quote.highHeavyGlassPremiumRate)} / sq ft`
+    ]);
+    rows.push(["Premium total", formatCurrency(quote.highHeavyGlassPremiumCost)]);
+  }
+
+  if (quote.singleDoorCount > 0) {
+    rows.push(["Single doors", `${quote.singleDoorCount} @ ${formatCurrency(quote.singleDoorPrice)}`]);
+  }
+
+  if (quote.pairDoorCount > 0) {
+    rows.push(["Pair doors", `${quote.pairDoorCount} @ ${formatCurrency(quote.pairDoorPrice)}`]);
+  }
+
+  if (quote.doorCost > 0) {
+    rows.push(["Door total", formatCurrency(quote.doorCost)]);
+  }
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
   doc.text("Customer Quote", x, y);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.text("Budgetary field quote based on measured opening area plus standard entrance adders.", x, y + 16);
+  doc.text("Budgetary interior field quote based on storefront area, high/heavy glass handling, and standard entrance adders.", x, y + 16);
 
   let currentY = y + 42;
   doc.setDrawColor(17, 24, 39);

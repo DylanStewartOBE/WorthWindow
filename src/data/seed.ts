@@ -10,6 +10,8 @@ export const seedJob: Job = {
   dateCreated: "2026-04-21",
   logoId: "worth-construction-default",
   activeRevision: "A",
+  activeElevationId: "elev-pair-door",
+  status: "active",
   elevationIds: ["elev-pair-door", "elev-no-door"]
 };
 
@@ -195,6 +197,8 @@ export function createBlankJob(createdBy: string): Job {
     dateCreated: new Date().toISOString().slice(0, 10),
     logoId: "worth-construction-default",
     activeRevision: "A",
+    activeElevationId: undefined,
+    status: "active",
     elevationIds: [],
   };
 }

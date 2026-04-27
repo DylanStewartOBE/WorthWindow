@@ -144,17 +144,23 @@ export function App() {
     const order = new Map(job.elevationIds.map((id, index) => [id, index]));
     return merged.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999) || a.name.localeCompare(b.name));
   }, [elevation, input.jobId, job, savedElevations]);
+  const activeJobs = useMemo(() => savedJobs.filter((savedJob) => normalizeJob(savedJob).status !== "archived"), [savedJobs]);
+  const archivedJobs = useMemo(() => savedJobs.filter((savedJob) => normalizeJob(savedJob).status === "archived"), [savedJobs]);
 
   useEffect(() => {
     Promise.all([repository.getJobs(), repository.getElevations()])
       .then(([jobs, elevations]) => {
+        const normalizedJobs = jobs.map(normalizeJob);
         if (jobs.length > 0) {
-          setSavedJobs(jobs);
+          setSavedJobs(normalizedJobs);
         }
         if (elevations.length > 0) {
           const firstElevation = elevations[0];
-          const firstJob = jobs.find((item) => item.id === firstElevation.jobId) ?? jobs[0] ?? seedJob;
-          const firstJobElevation = elevations.find((item) => item.jobId === firstJob.id) ?? firstElevation;
+          const firstJob = normalizedJobs.find((item) => item.id === firstElevation.jobId) ?? normalizedJobs[0] ?? seedJob;
+          const firstJobElevation =
+            elevations.find((item) => item.id === firstJob.activeElevationId) ??
+            elevations.find((item) => item.jobId === firstJob.id) ??
+            firstElevation;
           setSavedElevations(elevations);
           setJob(firstJob);
           setInput(toInput(firstJobElevation));
@@ -203,24 +209,34 @@ export function App() {
     setJob((current) => ({ ...current, [key]: value }));
   };
 
+  const saveJobState = (nextJob: Job, statusMessage: string) => {
+    const normalized = normalizeJob(nextJob);
+    setJob(normalized);
+    setSavedJobs((current) => uniqueById([...current.map(normalizeJob), normalized]));
+    repository.saveJob(normalized).catch(() => setStatus("Job changes are in memory until local storage is available"));
+    setStatus(statusMessage);
+  };
+
   const startNewJob = () => {
     const nextJob = createBlankJob(job.createdBy || "Dylan Stewart");
     const nextInput = createBlankElevationInput(nextJob.id, nextJob.createdBy);
-    const jobWithElevation = { ...nextJob, elevationIds: [nextInput.id] };
+    const jobWithElevation = normalizeJob({ ...nextJob, activeElevationId: nextInput.id, elevationIds: [nextInput.id] });
     setJob(jobWithElevation);
     setInput(nextInput);
     setJobSetupMode("new");
     setPdfUrls({});
     setRevisionCount(0);
-    setSavedJobs((current) => uniqueById([...current, jobWithElevation]));
+    setSavedJobs((current) => uniqueById([...current.map(normalizeJob), jobWithElevation]));
     repository.saveJob(jobWithElevation).catch(() => setStatus("New job is in memory until local storage is available"));
     setStatus("Started new job");
   };
 
   const loadExistingJob = (jobId: string) => {
-    const nextJob = savedJobs.find((item) => item.id === jobId);
+    const nextJob = savedJobs.map(normalizeJob).find((item) => item.id === jobId);
     if (!nextJob) return;
-    const nextElevation = savedElevations.find((item) => item.jobId === nextJob.id);
+    const nextElevation =
+      savedElevations.find((item) => item.id === nextJob.activeElevationId) ??
+      savedElevations.find((item) => item.jobId === nextJob.id);
     setJob(nextJob);
     if (nextElevation) {
       setInput(toInput(nextElevation));
@@ -235,12 +251,12 @@ export function App() {
 
   const createElevationForJob = () => {
     const nextInput = createBlankElevationInput(job.id, job.createdBy || "Dylan Stewart");
-    const nextJob = { ...job, elevationIds: unique([...job.elevationIds, nextInput.id]) };
+    const nextJob = normalizeJob({ ...job, activeElevationId: nextInput.id, status: "active", elevationIds: unique([...job.elevationIds, nextInput.id]) });
     setJob(nextJob);
     setInput(nextInput);
     setPdfUrls({});
     setRevisionCount(0);
-    setSavedJobs((current) => uniqueById([...current, nextJob]));
+    setSavedJobs((current) => uniqueById([...current.map(normalizeJob), nextJob]));
     repository.saveJob(nextJob).catch(() => setStatus("Elevation is in memory until local storage is available"));
     setStatus("Started new elevation for this job");
   };
@@ -249,10 +265,30 @@ export function App() {
     if (elevationId === input.id) return;
     const nextElevation = savedElevations.find((item) => item.id === elevationId);
     if (!nextElevation) return;
+    const nextJob = normalizeJob({ ...job, activeElevationId: elevationId });
     setInput(toInput(nextElevation));
+    saveJobState(nextJob, `Loaded ${nextElevation.name}`);
     setPdfUrls({});
     setRevisionCount(0);
-    setStatus(`Loaded ${nextElevation.name}`);
+  };
+
+  const archiveCurrentJob = () => {
+    saveJobState({ ...job, status: "archived", archivedAt: new Date().toISOString() }, "Archived current job");
+    setJobSetupMode("existing");
+  };
+
+  const restoreJob = (jobId: string) => {
+    const archivedJob = savedJobs.map(normalizeJob).find((item) => item.id === jobId);
+    if (!archivedJob) return;
+    const restoredJob = normalizeJob({ ...archivedJob, status: "active", archivedAt: undefined });
+    saveJobState(restoredJob, `Restored ${restoredJob.name || "job"}`);
+    const restoredElevation =
+      savedElevations.find((item) => item.id === restoredJob.activeElevationId) ??
+      savedElevations.find((item) => item.jobId === restoredJob.id);
+    if (restoredElevation) {
+      setInput(toInput(restoredElevation));
+    }
+    setJobSetupMode("existing");
   };
 
   const updateInput = (patch: Partial<ElevationInput>) => {
@@ -418,7 +454,13 @@ export function App() {
     const nextRevision = String.fromCharCode(65 + revisionCount);
     const calculated = { ...elevation, currentRevisionId: nextRevision };
     const revision = createRevisionSnapshot(calculated, nextRevision);
-    const nextJob = { ...job, activeRevision: nextRevision, elevationIds: unique([...job.elevationIds, input.id]) };
+    const nextJob = normalizeJob({
+      ...job,
+      activeRevision: nextRevision,
+      activeElevationId: input.id,
+      status: "active",
+      elevationIds: unique([...job.elevationIds, input.id])
+    });
     await repository.saveJob(nextJob);
     await repository.saveElevation(calculated);
     await repository.saveRevision(revision);
@@ -458,7 +500,7 @@ export function App() {
   };
 
   const loadSample = (sample: ElevationInput) => {
-    setJob(seedJob);
+    setJob(normalizeJob(seedJob));
     setInput(normalizeLayoutSizingInput(sample));
     setJobSetupMode("existing");
     setActiveStep(5);
@@ -468,7 +510,7 @@ export function App() {
   const duplicateElevation = () => {
     const nextId = `elev-${crypto.randomUUID?.() ?? Date.now()}`;
     setInput((current) => ({ ...current, id: nextId, name: `${current.name} copy`, jobId: job.id }));
-    setJob((current) => ({ ...current, elevationIds: unique([...current.elevationIds, nextId]) }));
+    setJob((current) => normalizeJob({ ...current, activeElevationId: nextId, elevationIds: unique([...current.elevationIds, nextId]) }));
     setStatus("Duplicated current elevation");
   };
 
@@ -514,7 +556,8 @@ export function App() {
               job={job}
               jobSetupMode={jobSetupMode}
               setJobSetupMode={setJobSetupMode}
-              savedJobs={savedJobs}
+              activeJobs={activeJobs}
+              archivedJobs={archivedJobs}
               jobElevations={jobElevations}
               activeElevationId={input.id}
               updateJob={updateJob}
@@ -524,6 +567,8 @@ export function App() {
               onLoadJob={loadExistingJob}
               onCreateElevation={createElevationForJob}
               onLoadElevation={loadJobElevation}
+              onArchiveJob={archiveCurrentJob}
+              onRestoreJob={restoreJob}
             />
           )}
           {activeStep === 1 && (
@@ -613,7 +658,8 @@ function JobStep({
   job,
   jobSetupMode,
   setJobSetupMode,
-  savedJobs,
+  activeJobs,
+  archivedJobs,
   jobElevations,
   activeElevationId,
   updateJob,
@@ -622,12 +668,15 @@ function JobStep({
   onStartNewJob,
   onLoadJob,
   onCreateElevation,
-  onLoadElevation
+  onLoadElevation,
+  onArchiveJob,
+  onRestoreJob
 }: {
   job: Job;
   jobSetupMode: JobSetupMode;
   setJobSetupMode: (mode: JobSetupMode) => void;
-  savedJobs: Job[];
+  activeJobs: Job[];
+  archivedJobs: Job[];
   jobElevations: Elevation[];
   activeElevationId: string;
   updateJob: <K extends keyof Job>(key: K, value: Job[K]) => void;
@@ -637,6 +686,8 @@ function JobStep({
   onLoadJob: (jobId: string) => void;
   onCreateElevation: () => void;
   onLoadElevation: (elevationId: string) => void;
+  onArchiveJob: () => void;
+  onRestoreJob: (jobId: string) => void;
 }) {
   return (
     <section className="step-content">
@@ -659,11 +710,11 @@ function JobStep({
       )}
 
       {jobSetupMode === "existing" && (
-        savedJobs.length > 0 ? (
+        activeJobs.length > 0 ? (
           <SelectField
             label="Existing job"
             value={job.id}
-            options={savedJobs.map((savedJob) => ({
+            options={activeJobs.map((savedJob) => ({
               id: savedJob.id,
               label: `${savedJob.number || "No number"} - ${savedJob.name || "Untitled job"}`
             }))}
@@ -705,6 +756,26 @@ function JobStep({
               <small>{item.currentRevisionId ? `Rev ${item.currentRevisionId}` : "Working"}</small>
             </button>
           ))
+        )}
+      </div>
+
+      <div className="job-management">
+        <button type="button" className="secondary-button wide" onClick={onArchiveJob}>Archive current job</button>
+        {archivedJobs.length > 0 && (
+          <SelectField
+            label="Restore archived job"
+            value=""
+            options={[
+              { id: "", label: "Select archived job" },
+              ...archivedJobs.map((archivedJob) => ({
+                id: archivedJob.id,
+                label: `${archivedJob.number || "No number"} - ${archivedJob.name || "Untitled job"}`
+              }))
+            ]}
+            onChange={(jobId) => {
+              if (jobId) onRestoreJob(jobId);
+            }}
+          />
         )}
       </div>
     </section>
@@ -1656,6 +1727,14 @@ function Metric({ label, value }: { label: string; value: string }) {
       <strong>{value}</strong>
     </div>
   );
+}
+
+function normalizeJob(job: Job): Job {
+  return {
+    ...job,
+    status: job.status ?? "active",
+    activeElevationId: job.activeElevationId ?? job.elevationIds[0]
+  };
 }
 
 function toInput(elevation: Elevation): ElevationInput {

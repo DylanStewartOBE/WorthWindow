@@ -456,6 +456,12 @@ h2 {
   font-weight: 800;
 }
 
+.job-management {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
 .metric-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);

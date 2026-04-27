@@ -7,6 +7,7 @@ export type DoorRowPlacement = "above" | "below";
 export type DoorSwing = "inswing" | "outswing";
 export type HingeType = "butt" | "pivot" | "continuous-gear" | "center-hung";
 export type ValidationSeverity = "info" | "warning" | "error";
+export type JobStatus = "active" | "archived";
 export type LiteType = "fixed" | "sidelite" | "transom" | "door-adjacent-lite";
 export type BayType = "lite" | "door" | "transom";
 export type DimensionOrientation = "horizontal" | "vertical";
@@ -87,6 +88,9 @@ export interface Job {
   dateCreated: string;
   logoId: string;
   activeRevision: string;
+  activeElevationId?: string;
+  status: JobStatus;
+  archivedAt?: string;
   elevationIds: string[];
 }
 

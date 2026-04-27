@@ -119,6 +119,7 @@ export function App() {
   const [savedElevations, setSavedElevations] = useState<Elevation[]>([]);
   const [revisionCount, setRevisionCount] = useState(0);
   const [, setStatus] = useState("Ready offline");
+  const [adminMode, setAdminMode] = useState(() => isAdminModeEnabled());
   const [adminOpen, setAdminOpen] = useState(false);
   const [pdfUrls, setPdfUrls] = useState<{ package?: string; quote?: string }>({});
   const [activeDoorSetIndex, setActiveDoorSetIndex] = useState(0);
@@ -176,6 +177,19 @@ export function App() {
       ?.querySelector<HTMLElement>(".step.active")
       ?.scrollIntoView({ block: "nearest", inline: "center" });
   }, [activeStep]);
+
+  useEffect(() => {
+    const openAdminShortcut = (event: globalThis.KeyboardEvent) => {
+      if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key.toLowerCase() === "a") {
+        event.preventDefault();
+        setAdminMode(true);
+        setAdminOpen(true);
+      }
+    };
+
+    window.addEventListener("keydown", openAdminShortcut);
+    return () => window.removeEventListener("keydown", openAdminShortcut);
+  }, []);
 
   useEffect(() => {
     setActiveDoorSetIndex((index) => clampIndex(index, Math.max(getDoorSetCount(input.doorConfig, input.columns), 1)));
@@ -544,9 +558,11 @@ export function App() {
             );
           })}
         </nav>
-        <button className="icon-button" onClick={() => setAdminOpen((open) => !open)} aria-label="Open admin config">
-          <Settings size={20} />
-        </button>
+        {adminMode && (
+          <button className="icon-button" onClick={() => setAdminOpen((open) => !open)} aria-label="Open admin config">
+            <Settings size={20} />
+          </button>
+        )}
       </div>
 
       <section className="workspace">
@@ -1779,6 +1795,11 @@ function unique(values: string[]): string[] {
 
 function uniqueById<T extends { id: string }>(items: T[]): T[] {
   return Array.from(new Map(items.map((item) => [item.id, item])).values());
+}
+
+function isAdminModeEnabled(): boolean {
+  const params = new URLSearchParams(window.location.search);
+  return params.get("admin") === "1" || window.location.hash === "#admin";
 }
 
 function clampIndex(value: number, count: number): number {

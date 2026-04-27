@@ -1,7 +1,15 @@
 import { jsPDF } from "jspdf";
 import { getDoorLeafVisuals } from "../domain/door";
-import { getDoorGlassCalloutMap, getGlassItemSquareFeet, getTotalGlassSquareFeet } from "../domain/glass";
+import {
+  DEFAULT_QUARTER_INCH_GLASS_WEIGHT_LBS_PER_SQFT,
+  getDoorGlassCalloutMap,
+  getGlassItemSquareFeet,
+  getGlassItemWeightPounds,
+  getTotalGlassSquareFeet,
+  getTotalGlassWeightPounds
+} from "../domain/glass";
 import { formatFeetInches, formatInches } from "../domain/format";
+import { calculateQuoteSummary } from "../domain/quote";
 import type { BrandingConfig, Elevation, Job, Lite, ValidationFlag } from "../domain/types";
 
 const LETTER_LANDSCAPE = {
@@ -41,6 +49,13 @@ export function generateDrawingPackagePdf(elevation: Elevation, job: Job, brandi
   return doc.output("blob");
 }
 
+export function generateQuotePdf(elevation: Elevation, job: Job, branding: BrandingConfig): Blob {
+  const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
+  drawSheetChrome(doc, "CUSTOMER QUOTE", "Q-1", elevation, job, branding);
+  drawQuoteSheet(doc, elevation, job, 54, 104, 684);
+  return doc.output("blob");
+}
+
 export function downloadBlob(blob: Blob, fileName: string): string {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
@@ -50,7 +65,7 @@ export function downloadBlob(blob: Blob, fileName: string): string {
   return url;
 }
 
-export function pdfFileName(job: Job, elevation: Elevation, type: "elevation" | "glass-takeoff" | "package"): string {
+export function pdfFileName(job: Job, elevation: Elevation, type: "elevation" | "glass-takeoff" | "package" | "quote"): string {
   const safeJob = sanitize(job.number || job.name || "job");
   const safeElevation = sanitize(elevation.name || elevation.id);
   return `${safeJob}-${safeElevation}-${type}-rev-${job.activeRevision || "A"}.pdf`;
@@ -350,10 +365,11 @@ function drawElevationNotes(doc: jsPDF, elevation: Elevation, x: number, y: numb
 }
 
 function drawGlassTable(doc: jsPDF, elevation: Elevation, x: number, y: number, width: number) {
-  const headers = ["Pic", "Mark", "Location", "Qty", "Width", "Height", "Sq Ft", "Glass", "Safety"];
-  const widths = [52, 42, 112, 34, 60, 60, 50, 182, 54];
+  const headers = ["Pic", "Mark", "Location", "Qty", "Width", "Height", "Sq Ft", "Wt/Pc", "Glass", "Safety"];
+  const widths = [50, 38, 104, 30, 56, 56, 46, 58, 214, 48];
   const rowHeight = 30;
   const totalSquareFeet = getTotalGlassSquareFeet(elevation.computedGlass.items);
+  const totalWeight = getTotalGlassWeightPounds(elevation.computedGlass.items);
   let currentY = y;
 
   doc.setFont("helvetica", "bold");
@@ -361,9 +377,13 @@ function drawGlassTable(doc: jsPDF, elevation: Elevation, x: number, y: number, 
   doc.text(elevation.name, x, currentY - 22);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.text("Glass size shown as final order size from DLO plus documented FG-2000 bite (5/16 in each side).", x, currentY - 9);
+  doc.text(
+    `Glass size shown as final order size from DLO plus documented FG-2000 bite. Weight uses ${DEFAULT_QUARTER_INCH_GLASS_WEIGHT_LBS_PER_SQFT} lb/sq ft.`,
+    x,
+    currentY - 9
+  );
   doc.setFont("helvetica", "bold");
-  doc.text(`Total glass: ${formatSquareFeet(totalSquareFeet)} sq ft`, x + width - 4, currentY - 9, {
+  doc.text(`Total glass: ${formatSquareFeet(totalSquareFeet)} sq ft / ${formatWeight(totalWeight)} lb`, x + width - 4, currentY - 9, {
     align: "right"
   });
 
@@ -395,6 +415,7 @@ function drawGlassTable(doc: jsPDF, elevation: Elevation, x: number, y: number, 
       formatInches(item.width),
       formatInches(item.height),
       formatSquareFeet(getGlassItemSquareFeet(item)),
+      `${formatWeight(getGlassItemWeightPounds(item))} lb`,
       item.glassType,
       item.safetyGlazingLikely ? "Likely" : "-"
     ];
@@ -402,7 +423,7 @@ function drawGlassTable(doc: jsPDF, elevation: Elevation, x: number, y: number, 
     drawGlassPictorial(doc, item.sourceType, representativeLite, currentX - 2, currentY + 4, widths[0] - 12, rowHeight - 8);
     currentX += widths[0];
     values.forEach((value, valueIndex) => {
-      const limit = valueIndex === 6 ? 34 : valueIndex === 5 ? 10 : 18;
+      const limit = valueIndex === 7 ? 34 : valueIndex === 6 ? 14 : valueIndex === 5 ? 10 : 18;
       doc.text(value.slice(0, limit), currentX, currentY + 18);
       currentX += widths[valueIndex + 1];
     });
@@ -414,8 +435,58 @@ function drawGlassTable(doc: jsPDF, elevation: Elevation, x: number, y: number, 
   doc.line(x, currentY, x + width, currentY);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
-  doc.text("TOTAL SQ FT", x + width - widths[8] - widths[7] - widths[6] + 8, currentY + 15);
-  doc.text(`${formatSquareFeet(totalSquareFeet)} sq ft`, x + width - 8, currentY + 15, { align: "right" });
+  doc.text("TOTALS", x + width - widths[9] - widths[8] - widths[7] - widths[6] + 8, currentY + 15);
+  doc.text(`${formatSquareFeet(totalSquareFeet)} sq ft`, x + width - widths[9] - widths[8] - 8, currentY + 15, { align: "right" });
+  doc.text(`${formatWeight(totalWeight)} lb`, x + width - widths[9] - widths[8] + widths[7] - 8, currentY + 15, { align: "right" });
+}
+
+function drawQuoteSheet(doc: jsPDF, elevation: Elevation, job: Job, x: number, y: number, width: number) {
+  const quote = calculateQuoteSummary(elevation);
+  const rows = [
+    ["Job", `${job.number || "-"} ${job.name || ""}`.trim()],
+    ["Customer", job.customer || "-"],
+    ["Elevation", elevation.name],
+    ["Opening area", `${formatSquareFeet(quote.openingSquareFeet)} sq ft @ ${formatCurrency(quote.installedRatePerSquareFoot)} / sq ft`],
+    ["Installed storefront", formatCurrency(quote.installedCost)],
+    ["Single doors", `${quote.singleDoorCount} @ ${formatCurrency(quote.singleDoorPrice)}`],
+    ["Pair doors", `${quote.pairDoorCount} @ ${formatCurrency(quote.pairDoorPrice)}`],
+    ["Door total", formatCurrency(quote.doorCost)]
+  ];
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text("Customer Quote", x, y);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(8);
+  doc.text("Budgetary field quote based on measured opening area plus standard entrance adders.", x, y + 16);
+
+  let currentY = y + 42;
+  doc.setDrawColor(17, 24, 39);
+  rows.forEach(([label, value], index) => {
+    if (index % 2 === 0) {
+      doc.setFillColor(248, 250, 252);
+      doc.rect(x, currentY - 14, width, 24, "F");
+    }
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(9);
+    doc.text(label, x + 10, currentY);
+    doc.setFont("helvetica", "normal");
+    doc.text(value, x + 190, currentY);
+    currentY += 24;
+  });
+
+  doc.setFillColor(72, 101, 47);
+  doc.rect(x, currentY + 10, width, 40, "F");
+  doc.setTextColor(255, 255, 255);
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  doc.text("Estimated Total", x + 12, currentY + 35);
+  doc.text(formatCurrency(quote.total), x + width - 12, currentY + 35, { align: "right" });
+  doc.setTextColor(17, 24, 39);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(7);
+  doc.text("Quote excludes engineering, structural review, taxes, permit fees, special hardware, and field conditions not captured in this v1 estimator.", x, currentY + 68);
 }
 
 function drawWrappedList(doc: jsPDF, items: string[], x: number, y: number, width: number, lineHeight: number) {
@@ -495,6 +566,14 @@ function drawGlassPictorial(
 
 function formatSquareFeet(value: number): string {
   return value.toFixed(2);
+}
+
+function formatWeight(value: number): string {
+  return value.toFixed(1);
+}
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 }
 
 function sanitize(value: string): string {

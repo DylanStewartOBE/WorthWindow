@@ -54,6 +54,7 @@ import { createRepository } from "../persistence/database";
 import {
   downloadBlob,
   generateDrawingPackagePdf,
+  generateQuotePdf,
   pdfFileName
 } from "../pdf/pdfGenerator";
 
@@ -119,7 +120,7 @@ export function App() {
   const [revisionCount, setRevisionCount] = useState(0);
   const [, setStatus] = useState("Ready offline");
   const [adminOpen, setAdminOpen] = useState(false);
-  const [pdfUrls, setPdfUrls] = useState<{ package?: string }>({});
+  const [pdfUrls, setPdfUrls] = useState<{ package?: string; quote?: string }>({});
   const [activeDoorSetIndex, setActiveDoorSetIndex] = useState(0);
   const [showAssemblyNumbers, setShowAssemblyNumbers] = useState(false);
   const [selectedAssemblyMark, setSelectedAssemblyMark] = useState<string | null>(null);
@@ -431,8 +432,15 @@ export function App() {
   const generatePdfs = () => {
     const packageBlob = generateDrawingPackagePdf(elevation, job, config.branding, { showAssemblyNumbers });
     const packageUrl = downloadBlob(packageBlob, pdfFileName(job, elevation, "package"));
-    setPdfUrls({ package: packageUrl });
+    setPdfUrls((current) => ({ ...current, package: packageUrl }));
     setStatus("PDF package generated");
+  };
+
+  const generateQuote = () => {
+    const quoteBlob = generateQuotePdf(elevation, job, config.branding);
+    const quoteUrl = downloadBlob(quoteBlob, pdfFileName(job, elevation, "quote"));
+    setPdfUrls((current) => ({ ...current, quote: quoteUrl }));
+    setStatus("Customer quote generated");
   };
 
   const sharePackage = async () => {
@@ -565,6 +573,7 @@ export function App() {
               job={job}
               pdfUrls={pdfUrls}
               onGenerate={generatePdfs}
+              onGenerateQuote={generateQuote}
               onShare={sharePackage}
               onSave={saveRevision}
               onDuplicate={duplicateElevation}
@@ -1087,6 +1096,7 @@ function OutputStep({
   job,
   pdfUrls,
   onGenerate,
+  onGenerateQuote,
   onShare,
   onSave,
   onDuplicate,
@@ -1095,8 +1105,9 @@ function OutputStep({
 }: {
   elevation: Elevation;
   job: Job;
-  pdfUrls: { package?: string };
+  pdfUrls: { package?: string; quote?: string };
   onGenerate: () => void;
+  onGenerateQuote: () => void;
   onShare: () => void;
   onSave: () => void;
   onDuplicate: () => void;
@@ -1110,6 +1121,10 @@ function OutputStep({
         <button className="primary-button wide" onClick={onGenerate}>
           <FileDown size={18} />
           Generate PDF package
+        </button>
+        <button className="secondary-button wide" onClick={onGenerateQuote}>
+          <FileText size={18} />
+          Generate customer quote
         </button>
         <button className="secondary-button wide" onClick={onShare}>
           <Share2 size={18} />
@@ -1128,6 +1143,12 @@ function OutputStep({
         <div className="result-band stacked">
           <strong>Generated package</strong>
           <a href={pdfUrls.package} target="_blank" rel="noreferrer">{pdfFileName(job, elevation, "package")}</a>
+        </div>
+      )}
+      {pdfUrls.quote && (
+        <div className="result-band stacked">
+          <strong>Generated quote</strong>
+          <a href={pdfUrls.quote} target="_blank" rel="noreferrer">{pdfFileName(job, elevation, "quote")}</a>
         </div>
       )}
       <div className="sample-actions">

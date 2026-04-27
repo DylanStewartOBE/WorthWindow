@@ -2,6 +2,8 @@ import { buildDoorGlassItems } from "./door";
 import { roundToPrecision, roundToSixteenth } from "./format";
 import type { ComputedGlass, DoorOpening, GlassConfig, GlassItem, Lite } from "./types";
 
+export const DEFAULT_QUARTER_INCH_GLASS_WEIGHT_LBS_PER_SQFT = 3.27;
+
 type GlassCandidate = GlassItem & {
   liteType: string;
 };
@@ -127,6 +129,30 @@ export function getGlassLineSquareFeet(item: Pick<GlassItem, "width" | "height" 
 export function getTotalGlassSquareFeet(items: Array<Pick<GlassItem, "width" | "height" | "qty">>): number {
   return roundToPrecision(
     items.reduce((total, item) => total + getGlassLineSquareFeet(item), 0),
+    2
+  );
+}
+
+export function getGlassItemWeightPounds(
+  item: Pick<GlassItem, "width" | "height" | "qty">,
+  poundsPerSquareFoot = DEFAULT_QUARTER_INCH_GLASS_WEIGHT_LBS_PER_SQFT
+): number {
+  return roundToPrecision(getGlassItemSquareFeet(item) * poundsPerSquareFoot, 2);
+}
+
+export function getGlassLineWeightPounds(
+  item: Pick<GlassItem, "width" | "height" | "qty">,
+  poundsPerSquareFoot = DEFAULT_QUARTER_INCH_GLASS_WEIGHT_LBS_PER_SQFT
+): number {
+  return roundToPrecision(getGlassItemWeightPounds(item, poundsPerSquareFoot) * item.qty, 2);
+}
+
+export function getTotalGlassWeightPounds(
+  items: Array<Pick<GlassItem, "width" | "height" | "qty">>,
+  poundsPerSquareFoot = DEFAULT_QUARTER_INCH_GLASS_WEIGHT_LBS_PER_SQFT
+): number {
+  return roundToPrecision(
+    items.reduce((total, item) => total + getGlassLineWeightPounds(item, poundsPerSquareFoot), 0),
     2
   );
 }

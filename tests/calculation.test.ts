@@ -7,9 +7,18 @@ import {
 } from "../src/config/options";
 import { calculateElevation, type CalculationContext } from "../src/domain/calculate";
 import { getDoorLeafVisuals } from "../src/domain/door";
-import { getDoorGlassCalloutMap, getGlassItemSquareFeet, getGlassLineSquareFeet, getTotalGlassSquareFeet } from "../src/domain/glass";
+import {
+  getDoorGlassCalloutMap,
+  getGlassItemSquareFeet,
+  getGlassItemWeightPounds,
+  getGlassLineSquareFeet,
+  getGlassLineWeightPounds,
+  getTotalGlassSquareFeet,
+  getTotalGlassWeightPounds
+} from "../src/domain/glass";
 import { getDoorColumnIndex } from "../src/domain/geometry";
 import { createSquaredMeasurementSet, getGoverningDimensions } from "../src/domain/measurements";
+import { calculateQuoteSummary } from "../src/domain/quote";
 import { createRevisionSnapshot } from "../src/domain/revision";
 import type { ElevationInput } from "../src/domain/types";
 import { noDoorSeedInput, pairDoorSeedInput } from "../src/data/seed";
@@ -143,6 +152,26 @@ describe("FG-2000 calculation engine", () => {
         { width: 12, height: 24, qty: 1 }
       ])
     ).toBe(14);
+  });
+
+  it("calculates piece and total glass weights from square footage", () => {
+    const item = { width: 24, height: 36, qty: 2 };
+
+    expect(getGlassItemWeightPounds(item)).toBe(19.62);
+    expect(getGlassLineWeightPounds(item)).toBe(39.24);
+    expect(getTotalGlassWeightPounds([item])).toBe(39.24);
+  });
+
+  it("calculates customer quote from opening square footage and door adders", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+    const quote = calculateQuoteSummary(elevation);
+
+    expect(quote.openingSquareFeet).toBe(134.66);
+    expect(quote.installedCost).toBe(13466);
+    expect(quote.singleDoorCount).toBe(0);
+    expect(quote.pairDoorCount).toBe(1);
+    expect(quote.doorCost).toBe(4500);
+    expect(quote.total).toBe(17966);
   });
 
   it("uses the selected second row as the transom row above an 84 inch door", () => {

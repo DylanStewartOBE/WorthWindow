@@ -1,0 +1,36 @@
+{
+  "system": {
+    "fg2000": "FG-2000 interior storefront framing.",
+    "outside-glazed": "Outside glazed storefront configuration.",
+    "inside-glazed": "Inside glazed storefront configuration."
+  },
+  "finish": {
+    "clear-anodized": "Finish: clear anodized aluminum.",
+    "bronze-anodized": "Finish: dark bronze anodized aluminum.",
+    "painted": "Finish: painted aluminum, color to be confirmed."
+  },
+  "glass": {
+    "quarter-clear": "Glass: 1/4 in clear monolithic glass.",
+    "quarter-tempered": "Glass: 1/4 in clear tempered safety glass.",
+    "quarter-laminated": "Glass: 1/4 in laminated safety glass."
+  },
+  "hardware": {
+    "outswing": "Door swing: outswing.",
+    "inswing": "Door swing: inswing; verify egress direction with project requirements.",
+    "butt": "Hinge: butt hinge.",
+    "pivot": "Hinge: pivot.",
+    "continuous-gear": "Hinge: continuous gear hinge.",
+    "center-hung": "Hinge: center hung.",
+    "rim-panic": "Hardware note: rim panic device.",
+    "surface-vertical-rod": "Hardware note: surface vertical rod panic device.",
+    "concealed-vertical-rod": "Hardware note: concealed vertical rod panic device.",
+    "closer": "Hardware note: closer required; surface or concealed as selected in final hardware set.",
+    "pull-push": "Hardware note: pull / push set."
+  },
+  "threshold": {
+    "standard-threshold": "Threshold / transition: standard accessible threshold, verify floor condition.",
+    "no-threshold": "Threshold / transition: no raised threshold shown; verify finished floor transition.",
+    "field-verify": "Threshold / transition: field verify existing transition before ordering."
+  }
+}
+

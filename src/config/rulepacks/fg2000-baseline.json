@@ -1,0 +1,81 @@
+{
+  "id": "fg2000-baseline",
+  "name": "FG-2000 Baseline Outside Glazed Storefront",
+  "systemName": "FG-2000",
+  "version": "0.1.0",
+  "nominalFaceWidth": 1.75,
+  "sightlines": {
+    "leftJamb": 1.75,
+    "rightJamb": 1.75,
+    "verticalMullion": 1.75,
+    "doorJamb": 1.75,
+    "head": 1.75,
+    "sill": 1.75,
+    "horizontalMullion": 1.75
+  },
+  "nominalDepth": 4.5,
+  "centerSet": true,
+  "typicalInfillThickness": 0.25,
+  "defaultAssemblyType": "shear-block",
+  "assemblyTypes": ["shear-block", "screw-spline", "stack"],
+  "perimeterJoints": {
+    "head": 0.25,
+    "sill": 0.25,
+    "leftJamb": 0.25,
+    "rightJamb": 0.25
+  },
+  "subsillOptions": {
+    "FG-2169": {
+      "label": "FG-2169 1/8 in subsill",
+      "height": 0.125
+    },
+    "FG-2246": {
+      "label": "FG-2246 1/2 in subsill",
+      "height": 0.5
+    },
+    "FG-2260": {
+      "label": "FG-2260 1/8 in subsill",
+      "height": 0.125
+    },
+    "FG-2180": {
+      "label": "FG-2180 3/8 in subsill",
+      "height": 0.375
+    }
+  },
+  "defaultSubsillId": "FG-2246",
+  "entranceSideliteSubsillAdd": 0.125,
+  "dloDeduct": {
+    "width": 3.5,
+    "height": 3.5
+  },
+  "glassBite": {
+    "leftJamb": 0.3125,
+    "rightJamb": 0.3125,
+    "verticalMullion": 0.3125,
+    "doorJamb": 0.3125,
+    "head": 0.3125,
+    "sill": 0.3125,
+    "horizontalMullion": 0.3125
+  },
+  "glassAdd": {
+    "width": 0.625,
+    "height": 0.625
+  },
+  "memberRules": {
+    "horizontalGlassStopDeduct": 0.0625
+  },
+  "transom": {
+    "minimumHeight": 6
+  },
+  "advisoryThresholds": {
+    "simpleRulePackMaxWidth": 240,
+    "simpleRulePackMaxHeight": 144,
+    "expansionVerticalWidth": 144
+  },
+  "notes": [
+    "FG-2000 storefront modeled as 1-3/4 in x 4-1/2 in center set framing.",
+    "Baseline V1 rule pack assumes rectangular interior elevation, outside glazed shear-block or screw-spline style assembly.",
+    "Storefront glass bite modeled per FG-2000 installation manual at 5/16 in each side; storefront glass size is D.L.O. plus 5/8 in.",
+    "Perimeter joints are rule-pack defaults and should be verified against approved project details."
+  ]
+}

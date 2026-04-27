@@ -1,0 +1,21 @@
+{
+  "name": "Worth Construction Field Measure",
+  "short_name": "Worth Field",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f8fafc",
+  "theme_color": "#48652f",
+  "description": "Offline-first field measuring and PDF drawing package generator for interior FG-2000 storefront elevations.",
+  "icons": [
+    {
+      "src": "/brand/worthcon-w.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "/brand/worthcon-w.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml"
+    }
+  ]
+}

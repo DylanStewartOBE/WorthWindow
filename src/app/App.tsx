@@ -38,11 +38,12 @@ import { createSquaredMeasurementSet } from "../domain/measurements";
 import { createRevisionSnapshot, getNextRevisionNumber } from "../domain/revision";
 import type {
   BrandingConfig,
+  ComputedGeometry,
+  CornerCondition,
   CornerConfig,
   CornerSide,
   DoorConfig,
   DoorSetConfig,
-  ComputedGeometry,
   Elevation,
   ElevationInput,
   EntranceRulePack,
@@ -107,9 +108,12 @@ type AssemblyRegion = {
 
 type CornerPlanContext = {
   primaryElevation: Elevation;
+  primaryLabel: string;
   returnElevation: Elevation | null;
+  returnLabel: string | null;
   side: CornerSide;
   angle: number;
+  condition: CornerCondition;
   cornerSightline: number;
   activeElevationId: string;
 };
@@ -125,7 +129,8 @@ const initialConfig: ConfigState = {
 const defaultCornerConfig: CornerConfig = {
   hasCorner: false,
   side: "right",
-  angle: 90
+  angle: 90,
+  condition: "outside"
 };
 
 export function App() {
@@ -185,15 +190,22 @@ export function App() {
             elevations.find((item) => item.id === firstJob.activeElevationId) ??
             elevations.find((item) => item.jobId === firstJob.id) ??
             firstElevation;
-          setSavedElevations(elevations);
+          const firstInput = toInput(firstJobElevation);
+          const syncedInput = inheritCornerReturnPatternOnLoad(firstInput, firstJob, elevations);
+          const syncedElevation = syncedInput !== firstInput ? calculateElevation(syncedInput, calculationContext) : null;
+          const nextElevations = syncedElevation ? uniqueById([...elevations, syncedElevation]) : elevations;
+          setSavedElevations(nextElevations);
           setJob(firstJob);
-          setInput(toInput(firstJobElevation));
+          setInput(syncedInput);
           setJobSetupMode("existing");
+          if (syncedElevation) {
+            repository.saveElevation(syncedElevation).catch(() => setStatus("Corner return is in memory until local storage is available"));
+          }
           setStatus("Loaded local job");
         }
       })
       .catch(() => setStatus("Using in-memory seed data"));
-  }, [repository]);
+  }, [calculationContext, repository]);
 
   useEffect(() => {
     stepperRef.current
@@ -366,7 +378,12 @@ export function App() {
   };
 
   const updateCorner = (patch: Partial<CornerConfig>) => {
-    const nextCorner = normalizeCornerConfig({ ...input.cornerConfig, ...patch });
+    const continuationSide = getContinuationCornerSide(input.id, savedElevations);
+    const nextCorner = normalizeCornerConfig({
+      ...input.cornerConfig,
+      ...patch,
+      side: continuationSide ?? patch.side ?? input.cornerConfig.side
+    });
 
     if (!nextCorner.hasCorner) {
       const nextInput = normalizeLayoutSizingInput({ ...input, cornerConfig: { ...nextCorner, linkedElevationId: undefined } });
@@ -375,7 +392,7 @@ export function App() {
       setSavedElevations((current) => uniqueById([...current, calculated]));
       repository.saveElevation(calculated).catch(() => setStatus("Corner change is in memory until local storage is available"));
       setPreviewMode("elevation");
-      setStatus("Corner removed from this elevation");
+      setStatus(input.cornerConfig.hasCorner ? "Corner removed from this elevation" : "Corner settings updated");
       return;
     }
 
@@ -413,10 +430,10 @@ export function App() {
           rowSizingMode: "custom",
           rowHeights: inheritedRowHeights,
           cornerConfig: {
-            hasCorner: true,
-            side: oppositeCornerSide(nextInput.cornerConfig.side),
-            angle: 90,
-            linkedElevationId: nextInput.id
+            hasCorner: false,
+            side: nextInput.cornerConfig.side,
+            angle: baseReturnInput.cornerConfig.angle,
+            condition: baseReturnInput.cornerConfig.condition
           }
         }
       )
@@ -437,7 +454,7 @@ export function App() {
     repository.saveElevation(calculatedCurrent).catch(() => setStatus("Corner elevation is in memory until local storage is available"));
     repository.saveElevation(calculatedReturn).catch(() => setStatus("Corner return is in memory until local storage is available"));
     setPreviewMode("plan");
-    setStatus(`${titleCase(nextInput.cornerConfig.side)} corner return added`);
+    setStatus(`${titleCase(nextInput.cornerConfig.side)} corner continuation added`);
   };
 
   const updateDoorSetCount = (value: number) => {
@@ -712,13 +729,13 @@ export function App() {
             <LayoutStep
               input={input}
               elevation={elevation}
+              jobElevations={jobElevations}
               updateLayoutCount={updateLayoutCount}
               updateDoorSetCount={updateDoorSetCount}
               updateSizingMode={updateSizingMode}
               updateCustomSize={updateCustomSize}
               updateDoor={updateDoor}
               updateCorner={updateCorner}
-              cornerSightline={getCornerMullionSightline(config.storefrontRulePack)}
               onShowFloorPlan={() => setPreviewMode("plan")}
               onSelectColumnAssembly={(columnIndex) => setSelectedAssemblyMark(`A${columnIndex + 1}`)}
             />
@@ -768,6 +785,7 @@ export function App() {
         <aside className="preview-panel">
           <ElevationPreview
             elevation={elevation}
+            jobElevations={jobElevations}
             cornerPlan={cornerPlan}
             previewMode={previewMode}
             showAssemblyNumbers={showAssemblyNumbers}
@@ -968,25 +986,25 @@ function MeasureStep({
 function LayoutStep({
   input,
   elevation,
+  jobElevations,
   updateLayoutCount,
   updateDoorSetCount,
   updateSizingMode,
   updateCustomSize,
   updateDoor,
   updateCorner,
-  cornerSightline,
   onShowFloorPlan,
   onSelectColumnAssembly
 }: {
   input: ElevationInput;
   elevation: Elevation;
+  jobElevations: Elevation[];
   updateLayoutCount: (axis: "rows" | "columns", value: number) => void;
   updateDoorSetCount: (value: number) => void;
   updateSizingMode: (axis: LayoutAxis, mode: LayoutSizingMode) => void;
   updateCustomSize: (axis: LayoutAxis, index: number, value: number | null) => void;
   updateDoor: (patch: Partial<DoorConfig>) => void;
   updateCorner: (patch: Partial<CornerConfig>) => void;
-  cornerSightline: number;
   onShowFloorPlan: () => void;
   onSelectColumnAssembly: (columnIndex: number) => void;
 }) {
@@ -996,6 +1014,14 @@ function LayoutStep({
   const rowFields = getCustomSizingFieldStates("row", input, elevation, doorColumnIndex);
   const columnManualLimit = getCustomManualLimit("column", input, doorColumnIndex);
   const rowManualLimit = getCustomManualLimit("row", input, doorColumnIndex);
+  const continuationSide = getContinuationCornerSide(input.id, jobElevations);
+  const cornerSide = continuationSide ?? input.cornerConfig.side;
+  const cornerSideOptions = continuationSide
+    ? [{ value: continuationSide, label: titleCase(continuationSide) }]
+    : [
+        { value: "left", label: "Left" },
+        { value: "right", label: "Right" }
+      ];
 
   return (
     <section className="step-content">
@@ -1015,41 +1041,39 @@ function LayoutStep({
         <p className="layout-note">One door set can occupy each left-to-right bay. Door package details live on the Door tab.</p>
       )}
       <Segmented
-        label="Corner"
-        value={input.cornerConfig.hasCorner ? "yes" : "no"}
-        options={[
-          { value: "no", label: "No" },
-          { value: "yes", label: "Yes" }
-        ]}
-        onChange={(value) => updateCorner({ hasCorner: value === "yes" })}
+        label="Corner side"
+        value={cornerSide}
+        options={cornerSideOptions}
+        onChange={(value) => updateCorner({ side: value as CornerSide })}
       />
-      {input.cornerConfig.hasCorner && (
-        <>
-          <Segmented
-            label="Corner side"
-            value={input.cornerConfig.side}
-            options={[
-              { value: "left", label: "Left" },
-              { value: "right", label: "Right" }
-            ]}
-            onChange={(value) => updateCorner({ side: value as CornerSide, hasCorner: true })}
-          />
-          <div className="result-band stacked">
-            <strong>90 degree corner</strong>
-            <span>Corner mullion sightline assumed at {formatInches(cornerSightline)}. The return elevation inherits this job's horizontal pattern.</span>
-          </div>
-          <button
-            type="button"
-            className="secondary-button wide"
-            onClick={() => {
-              updateCorner({ hasCorner: true });
-              onShowFloorPlan();
-            }}
-          >
-            Show floor plan selector
-          </button>
-        </>
-      )}
+      <Segmented
+        label="Corner type"
+        value={input.cornerConfig.condition}
+        options={[
+          { value: "outside", label: "Outside" },
+          { value: "inside", label: "Inside" }
+        ]}
+        onChange={(value) => updateCorner({ condition: value as CornerCondition })}
+      />
+      <div className="field-grid compact">
+        <NumberField
+          label="Corner angle"
+          value={input.cornerConfig.angle}
+          kind="count"
+          min={1}
+          onChange={(value) => updateCorner({ angle: value })}
+        />
+      </div>
+      <button
+        type="button"
+        className="secondary-button wide"
+        onClick={() => {
+          updateCorner({ hasCorner: true });
+          onShowFloorPlan();
+        }}
+      >
+        {input.cornerConfig.hasCorner ? "Open floor plan selector" : "Add next elevation at corner"}
+      </button>
       {input.doorConfig.hasDoor && input.rows > 1 && (
         <Segmented
           label="Extra rows"
@@ -1418,6 +1442,7 @@ function OutputStep({
 
 function ElevationPreview({
   elevation,
+  jobElevations,
   cornerPlan,
   previewMode,
   showAssemblyNumbers,
@@ -1426,6 +1451,7 @@ function ElevationPreview({
   onSelectElevation
 }: {
   elevation: Elevation;
+  jobElevations: Elevation[];
   cornerPlan: CornerPlanContext | null;
   previewMode: PreviewMode;
   showAssemblyNumbers: boolean;
@@ -1443,6 +1469,8 @@ function ElevationPreview({
   const visibleAssemblyCallouts = geometry.assemblyCallouts.filter((callout) => shouldShowAssemblyCallout(callout, showAssemblyNumbers));
   const mainAssemblyRegions = getMainAssemblyRegions(elevation);
   const selectedRegion = mainAssemblyRegions.find((region) => region.mark === selectedAssemblyMark);
+  const cornerSides = getElevationCornerSides(elevation, jobElevations);
+  const cornerMullionSightline = geometry.sightlines.cornerMullion ?? geometry.sightlines.verticalMullion * 2;
   const handleRegionKeyDown = (event: KeyboardEvent<SVGRectElement>, region: AssemblyRegion) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
@@ -1476,6 +1504,16 @@ function ElevationPreview({
             width={lite.dloWidth}
             height={lite.dloHeight}
             className={lite.type === "transom" ? "svg-transom" : "svg-lite"}
+          />
+        ))}
+        {cornerSides.map((side) => (
+          <rect
+            key={`corner-member-${side}`}
+            x={side === "left" ? 0 : geometry.frameWidth - cornerMullionSightline}
+            y={0}
+            width={cornerMullionSightline}
+            height={geometry.frameHeight}
+            className="svg-corner-member"
           />
         ))}
         {geometry.doorOpenings.map((door, doorIndex) => (
@@ -1626,8 +1664,10 @@ function CornerPlanPreview({
   const padding = Math.max(profileWidth * 4, 18);
   const cornerX = plan.side === "left" ? 0 : primaryWidth;
   const returnX = plan.side === "left" ? -profileWidth : primaryWidth;
+  const returnGoesUp = plan.condition === "outside";
+  const returnY = returnGoesUp ? -returnWidth : 0;
   const viewX = plan.side === "left" ? -padding - profileWidth : -padding;
-  const viewY = -returnWidth - padding;
+  const viewY = returnGoesUp ? -returnWidth - padding : -padding;
   const viewWidth = primaryWidth + padding * 2 + profileWidth;
   const viewHeight = returnWidth + padding * 2 + profileWidth;
   const primaryActive = plan.activeElevationId === plan.primaryElevation.id;
@@ -1637,11 +1677,11 @@ function CornerPlanPreview({
     <section className="drawing-preview">
       <div className="preview-header">
         <strong>Corner Floor Plan</strong>
-        <span>{plan.angle} degree {plan.side} return</span>
+        <span>{plan.angle} degree {plan.condition} corner</span>
       </div>
       <svg viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`} role="img" aria-label="Corner floor plan selector">
         <line x1={0} y1={profileWidth + 10} x2={primaryWidth} y2={profileWidth + 10} className="svg-plan-datum" />
-        <line x1={cornerX} y1={0} x2={cornerX} y2={-returnWidth} className="svg-plan-datum" />
+        <line x1={cornerX} y1={0} x2={cornerX} y2={returnGoesUp ? -returnWidth : returnWidth} className="svg-plan-datum" />
         <rect
           x={0}
           y={0}
@@ -1651,7 +1691,7 @@ function CornerPlanPreview({
         />
         <rect
           x={returnX}
-          y={-returnWidth}
+          y={returnY}
           width={profileWidth}
           height={returnWidth}
           className={`svg-plan-leg ${returnActive ? "selected" : ""}`}
@@ -1680,7 +1720,7 @@ function CornerPlanPreview({
         {plan.returnElevation && (
           <rect
             x={returnX - profileWidth * 1.5}
-            y={-returnWidth}
+            y={returnY}
             width={profileWidth * 4}
             height={returnWidth}
             className="svg-plan-hit-area"
@@ -1693,29 +1733,28 @@ function CornerPlanPreview({
             }}
           />
         )}
-        <text x={primaryWidth / 2} y={-6} className="svg-plan-label" textAnchor="middle">
-          {primaryActive ? "Editing " : ""}E1
+        <text x={primaryWidth / 2} y={returnGoesUp ? profileWidth + 9 : -5} className="svg-plan-label" textAnchor="middle">
+          {plan.primaryLabel}
         </text>
         {plan.returnElevation && (
           <text
-            x={plan.side === "left" ? returnX - 7 : returnX + profileWidth + 7}
-            y={-returnWidth / 2}
+            x={returnX + profileWidth / 2}
+            y={returnY + returnWidth / 2}
             className="svg-plan-label"
-            textAnchor={plan.side === "left" ? "end" : "start"}
+            textAnchor="middle"
           >
-            {returnActive ? "Editing " : ""}E2
+            {plan.returnLabel}
           </text>
         )}
         <text
           x={plan.side === "left" ? -profileWidth - 4 : primaryWidth + profileWidth + 4}
-          y={-6}
+          y={returnGoesUp ? -6 : profileWidth + 9}
           className="svg-plan-corner-label"
           textAnchor={plan.side === "left" ? "end" : "start"}
         >
           Corner {formatInches(plan.cornerSightline)}
         </text>
       </svg>
-      <p className="layout-note">Tap a leg to edit that elevation. Horizontal rows stay tied to the first elevation pattern.</p>
     </section>
   );
 }
@@ -2129,12 +2168,14 @@ function toInput(elevation: Elevation): ElevationInput {
 function normalizeCornerConfig(cornerConfig?: Partial<CornerConfig>): CornerConfig {
   const side = cornerConfig?.side === "left" ? "left" : "right";
   const angle = Number.isFinite(cornerConfig?.angle) && cornerConfig?.angle ? Number(cornerConfig.angle) : 90;
+  const condition = cornerConfig?.condition === "inside" ? "inside" : "outside";
   return {
     ...defaultCornerConfig,
     ...cornerConfig,
     hasCorner: Boolean(cornerConfig?.hasCorner),
     side,
     angle,
+    condition,
     linkedElevationId: cornerConfig?.hasCorner ? cornerConfig.linkedElevationId : undefined
   };
 }
@@ -2182,6 +2223,7 @@ function inheritCornerReturnPatternOnLoad(
 
   const sourceElevation = savedElevations.find((item) => item.id === cornerConfig.linkedElevationId);
   if (!sourceElevation) return input;
+  const sourceCorner = normalizeCornerConfig(sourceElevation.cornerConfig);
 
   return normalizeLayoutSizingInput({
     ...input,
@@ -2191,7 +2233,13 @@ function inheritCornerReturnPatternOnLoad(
     ),
     rows: sourceElevation.computedGeometry.rowHeights.length,
     rowSizingMode: "custom",
-    rowHeights: buildInheritedRowHeightInputs(sourceElevation.computedGeometry.rowHeights)
+    rowHeights: buildInheritedRowHeightInputs(sourceElevation.computedGeometry.rowHeights),
+    cornerConfig: {
+      hasCorner: false,
+      side: sourceCorner.side,
+      angle: 90,
+      condition: "outside"
+    }
   });
 }
 
@@ -2227,10 +2275,10 @@ function createCornerReturnElevationInput(
     columnWidths: buildBlankSizingInputs(source.columns),
     doorConfig: createNoDoorConfig(source.doorConfig),
     cornerConfig: {
-      hasCorner: true,
-      side: oppositeCornerSide(source.cornerConfig.side),
+      hasCorner: false,
+      side: source.cornerConfig.side,
       angle: 90,
-      linkedElevationId: source.id
+      condition: source.cornerConfig.condition
     }
   });
 }
@@ -2251,6 +2299,31 @@ function oppositeCornerSide(side: CornerSide): CornerSide {
   return side === "left" ? "right" : "left";
 }
 
+function getIncomingCornerParent(elevationId: string, elevations: Elevation[]): Elevation | undefined {
+  return elevations.find((item) => normalizeCornerConfig(item.cornerConfig).linkedElevationId === elevationId);
+}
+
+function getContinuationCornerSide(elevationId: string, elevations: Elevation[]): CornerSide | undefined {
+  const incomingParent = getIncomingCornerParent(elevationId, elevations);
+  return incomingParent ? normalizeCornerConfig(incomingParent.cornerConfig).side : undefined;
+}
+
+function getElevationPlanLabel(elevations: Elevation[], elevationId: string): string {
+  const index = elevations.findIndex((item) => item.id === elevationId);
+  return `E${index >= 0 ? index + 1 : elevations.length + 1}`;
+}
+
+function getElevationCornerSides(elevation: Elevation, elevations: Elevation[]): CornerSide[] {
+  const sides = new Set<CornerSide>();
+  const corner = normalizeCornerConfig(elevation.cornerConfig);
+  if (corner.hasCorner) sides.add(corner.side);
+  const incomingParent = getIncomingCornerParent(elevation.id, elevations);
+  if (incomingParent) {
+    sides.add(oppositeCornerSide(normalizeCornerConfig(incomingParent.cornerConfig).side));
+  }
+  return Array.from(sides);
+}
+
 function getCornerMullionSightline(storefrontRulePack: StorefrontRulePack): number {
   return storefrontRulePack.sightlines.cornerMullion ?? storefrontRulePack.nominalFaceWidth * 2;
 }
@@ -2262,26 +2335,33 @@ function getCornerPlanContext(
 ): CornerPlanContext | null {
   const activeCorner = normalizeCornerConfig(activeElevation.cornerConfig);
   if (activeCorner.hasCorner) {
+    const returnElevation = activeCorner.linkedElevationId
+      ? elevations.find((item) => item.id === activeCorner.linkedElevationId) ?? null
+      : null;
     return {
       primaryElevation: activeElevation,
-      returnElevation: activeCorner.linkedElevationId
-        ? elevations.find((item) => item.id === activeCorner.linkedElevationId) ?? null
-        : null,
+      primaryLabel: getElevationPlanLabel(elevations, activeElevation.id),
+      returnElevation,
+      returnLabel: returnElevation ? getElevationPlanLabel(elevations, returnElevation.id) : null,
       side: activeCorner.side,
       angle: activeCorner.angle,
+      condition: activeCorner.condition,
       cornerSightline: getCornerMullionSightline(storefrontRulePack),
       activeElevationId: activeElevation.id
     };
   }
 
-  const parentElevation = elevations.find((item) => normalizeCornerConfig(item.cornerConfig).linkedElevationId === activeElevation.id);
+  const parentElevation = getIncomingCornerParent(activeElevation.id, elevations);
   if (!parentElevation) return null;
   const parentCorner = normalizeCornerConfig(parentElevation.cornerConfig);
   return {
     primaryElevation: parentElevation,
+    primaryLabel: getElevationPlanLabel(elevations, parentElevation.id),
     returnElevation: activeElevation,
+    returnLabel: getElevationPlanLabel(elevations, activeElevation.id),
     side: parentCorner.side,
     angle: parentCorner.angle,
+    condition: parentCorner.condition,
     cornerSightline: getCornerMullionSightline(storefrontRulePack),
     activeElevationId: activeElevation.id
   };

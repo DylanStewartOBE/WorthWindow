@@ -1709,7 +1709,7 @@ function buildNotes(
     noteLibrary.finish[input.finishConfig.finishId],
     noteLibrary.glass[input.glassConfig.glassTypeId],
     input.cornerConfig.hasCorner
-      ? `Corner condition: ${input.cornerConfig.angle} degree ${input.cornerConfig.side} return with corner mullion sightline assumed at ${getCornerMullionSightline(storefrontRules)} in.`
+      ? `Corner condition: ${input.cornerConfig.angle} degree ${input.cornerConfig.condition ?? "outside"} ${input.cornerConfig.side} return with corner mullion sightline assumed at ${getCornerMullionSightline(storefrontRules)} in.`
       : undefined,
     input.doorConfig.swing ? noteLibrary.hardware[input.doorConfig.swing] : undefined,
     input.doorConfig.hingeType ? noteLibrary.hardware[input.doorConfig.hingeType] : undefined,

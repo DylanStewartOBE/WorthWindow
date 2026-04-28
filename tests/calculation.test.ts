@@ -224,13 +224,14 @@ describe("FG-2000 calculation engine", () => {
           hasCorner: true,
           side: "left",
           angle: 90,
+          condition: "outside",
           linkedElevationId: "elev-return"
         }
       },
       context
     );
 
-    expect(elevation.computedGeometry.notes.some((note) => note.includes("90 degree left return"))).toBe(true);
+    expect(elevation.computedGeometry.notes.some((note) => note.includes("90 degree outside left return"))).toBe(true);
     expect(elevation.computedGeometry.notes.some((note) => note.includes("3.5 in"))).toBe(true);
   });
 

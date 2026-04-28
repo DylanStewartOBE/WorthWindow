@@ -7,6 +7,7 @@ export type DoorRowPlacement = "above" | "below";
 export type DoorSwing = "inswing" | "outswing";
 export type HingeType = "butt" | "pivot" | "continuous-gear" | "center-hung";
 export type CornerSide = "left" | "right";
+export type CornerCondition = "outside" | "inside";
 export type ValidationSeverity = "info" | "warning" | "error";
 export type JobStatus = "active" | "archived";
 export type LiteType = "fixed" | "sidelite" | "transom" | "door-adjacent-lite";
@@ -84,6 +85,7 @@ export interface CornerConfig {
   hasCorner: boolean;
   side: CornerSide;
   angle: number;
+  condition: CornerCondition;
   linkedElevationId?: string;
 }
 

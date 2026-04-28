@@ -66,7 +66,8 @@ export const pairDoorSeedInput: ElevationInput = {
   cornerConfig: {
     hasCorner: false,
     side: "right",
-    angle: 90
+    angle: 90,
+    condition: "outside"
   },
   finishConfig: {
     finishId: "bronze-anodized",
@@ -117,7 +118,8 @@ export const noDoorSeedInput: ElevationInput = {
   cornerConfig: {
     hasCorner: false,
     side: "right",
-    angle: 90
+    angle: 90,
+    condition: "outside"
   },
   finishConfig: {
     finishId: "clear-anodized",
@@ -187,7 +189,8 @@ export function createBlankElevationInput(jobId: string, createdBy: string): Ele
     cornerConfig: {
       hasCorner: false,
       side: "right",
-      angle: 90
+      angle: 90,
+      condition: "outside"
     },
     finishConfig: {
       finishId: "clear-anodized",

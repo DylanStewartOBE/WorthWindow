@@ -540,7 +540,8 @@ h2 {
 .svg-door,
 .svg-door-leaf,
 .svg-door-glass,
-.svg-door-dash {
+.svg-door-dash,
+.svg-corner-member {
   vector-effect: non-scaling-stroke;
 }
 
@@ -560,6 +561,12 @@ h2 {
   fill: #ffffff;
   stroke: #111827;
   stroke-width: 0.95;
+}
+
+.svg-corner-member {
+  fill: #f8fafc;
+  stroke: #111827;
+  stroke-width: 1.45;
 }
 
 .svg-transom {

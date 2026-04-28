@@ -38,6 +38,8 @@ import { createSquaredMeasurementSet } from "../domain/measurements";
 import { createRevisionSnapshot, getNextRevisionNumber } from "../domain/revision";
 import type {
   BrandingConfig,
+  CornerConfig,
+  CornerSide,
   DoorConfig,
   DoorSetConfig,
   Elevation,
@@ -91,6 +93,7 @@ type CustomSizingFieldState = {
 };
 
 type AssemblySelectionType = "column" | "door";
+type PreviewMode = "elevation" | "plan";
 
 type AssemblyRegion = {
   mark: string;
@@ -101,12 +104,27 @@ type AssemblyRegion = {
   height: number;
 };
 
+type CornerPlanContext = {
+  primaryElevation: Elevation;
+  returnElevation: Elevation | null;
+  side: CornerSide;
+  angle: number;
+  cornerSightline: number;
+  activeElevationId: string;
+};
+
 const initialConfig: ConfigState = {
   storefrontRulePack: defaultStorefrontRulePack,
   entranceRulePack: defaultEntranceRulePack,
   noteLibrary: defaultNoteLibrary,
   validationLibrary: defaultValidationLibrary,
   branding: defaultBranding
+};
+
+const defaultCornerConfig: CornerConfig = {
+  hasCorner: false,
+  side: "right",
+  angle: 90
 };
 
 export function App() {
@@ -124,6 +142,7 @@ export function App() {
   const [activeDoorSetIndex, setActiveDoorSetIndex] = useState(0);
   const [showAssemblyNumbers, setShowAssemblyNumbers] = useState(false);
   const [selectedAssemblyMark, setSelectedAssemblyMark] = useState<string | null>(null);
+  const [previewMode, setPreviewMode] = useState<PreviewMode>("elevation");
   const stepperRef = useRef<HTMLElement | null>(null);
 
   const repository = useMemo(() => createRepository(), []);
@@ -144,6 +163,10 @@ export function App() {
     const order = new Map(job.elevationIds.map((id, index) => [id, index]));
     return merged.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999) || a.name.localeCompare(b.name));
   }, [elevation, input.jobId, job, savedElevations]);
+  const cornerPlan = useMemo(
+    () => getCornerPlanContext(jobElevations, elevation, config.storefrontRulePack),
+    [config.storefrontRulePack, elevation, jobElevations]
+  );
   const activeJobs = useMemo(() => savedJobs.filter((savedJob) => normalizeJob(savedJob).status !== "archived"), [savedJobs]);
   const archivedJobs = useMemo(() => savedJobs.filter((savedJob) => normalizeJob(savedJob).status === "archived"), [savedJobs]);
 
@@ -261,7 +284,12 @@ export function App() {
   };
 
   const createElevationForJob = () => {
-    const nextInput = createBlankElevationInput(job.id, job.createdBy || "Dylan Stewart");
+    const template = getFirstElevationTemplate(job, savedElevations, input);
+    const nextInput = inheritHorizontalPattern(
+      createBlankElevationInput(job.id, job.createdBy || "Dylan Stewart"),
+      template,
+      { name: "Field elevation" }
+    );
     const nextJob = normalizeJob({ ...job, activeElevationId: nextInput.id, status: "active", elevationIds: unique([...job.elevationIds, nextInput.id]) });
     setJob(nextJob);
     setInput(nextInput);
@@ -279,6 +307,12 @@ export function App() {
     setInput(toInput(nextElevation));
     saveJobState(nextJob, `Loaded ${nextElevation.name}`);
     setPdfUrls({});
+  };
+
+  const selectElevationFromPlan = (elevationId: string) => {
+    loadJobElevation(elevationId);
+    setPreviewMode("elevation");
+    setActiveStep(2);
   };
 
   const archiveCurrentJob = () => {
@@ -321,6 +355,72 @@ export function App() {
         doorConfig: normalizeDoorConfig({ ...current.doorConfig, ...patch }, current.rows, current.columns)
       })
     );
+  };
+
+  const updateCorner = (patch: Partial<CornerConfig>) => {
+    const nextCorner = normalizeCornerConfig({ ...input.cornerConfig, ...patch });
+
+    if (!nextCorner.hasCorner) {
+      const nextInput = normalizeLayoutSizingInput({ ...input, cornerConfig: { ...nextCorner, linkedElevationId: undefined } });
+      const calculated = calculateElevation(nextInput, calculationContext);
+      setInput(nextInput);
+      setSavedElevations((current) => uniqueById([...current, calculated]));
+      repository.saveElevation(calculated).catch(() => setStatus("Corner change is in memory until local storage is available"));
+      setPreviewMode("elevation");
+      setStatus("Corner removed from this elevation");
+      return;
+    }
+
+    const linkedElevationId = nextCorner.linkedElevationId ?? createId("elev");
+    const nextInput = normalizeLayoutSizingInput({
+      ...input,
+      cornerConfig: {
+        ...nextCorner,
+        hasCorner: true,
+        angle: 90,
+        linkedElevationId
+      }
+    });
+    const calculatedCurrent = calculateElevation(nextInput, calculationContext);
+    const existingReturn = savedElevations.find((item) => item.id === linkedElevationId);
+    const returnInput = normalizeLayoutSizingInput(
+      inheritHorizontalPattern(
+        existingReturn
+          ? toInput(existingReturn)
+          : createCornerReturnElevationInput(
+              nextInput,
+              linkedElevationId,
+              calculatedCurrent.computedGeometry.frameHeight,
+              config.storefrontRulePack
+            ),
+        nextInput,
+        {
+          cornerConfig: {
+            hasCorner: true,
+            side: oppositeCornerSide(nextInput.cornerConfig.side),
+            angle: 90,
+            linkedElevationId: nextInput.id
+          }
+        }
+      )
+    );
+    const calculatedReturn = calculateElevation(returnInput, calculationContext);
+    const nextJob = normalizeJob({
+      ...job,
+      activeElevationId: nextInput.id,
+      status: "active",
+      elevationIds: unique([...job.elevationIds, nextInput.id, returnInput.id])
+    });
+
+    setInput(nextInput);
+    setJob(nextJob);
+    setSavedJobs((current) => uniqueById([...current.map(normalizeJob), nextJob]));
+    setSavedElevations((current) => uniqueById([...current, calculatedCurrent, calculatedReturn]));
+    repository.saveJob(nextJob).catch(() => setStatus("Corner job update is in memory until local storage is available"));
+    repository.saveElevation(calculatedCurrent).catch(() => setStatus("Corner elevation is in memory until local storage is available"));
+    repository.saveElevation(calculatedReturn).catch(() => setStatus("Corner return is in memory until local storage is available"));
+    setPreviewMode("plan");
+    setStatus(`${titleCase(nextInput.cornerConfig.side)} corner return added`);
   };
 
   const updateDoorSetCount = (value: number) => {
@@ -600,6 +700,9 @@ export function App() {
               updateSizingMode={updateSizingMode}
               updateCustomSize={updateCustomSize}
               updateDoor={updateDoor}
+              updateCorner={updateCorner}
+              cornerSightline={getCornerMullionSightline(config.storefrontRulePack)}
+              onShowFloorPlan={() => setPreviewMode("plan")}
               onSelectColumnAssembly={(columnIndex) => setSelectedAssemblyMark(`A${columnIndex + 1}`)}
             />
           )}
@@ -648,9 +751,12 @@ export function App() {
         <aside className="preview-panel">
           <ElevationPreview
             elevation={elevation}
+            cornerPlan={cornerPlan}
+            previewMode={previewMode}
             showAssemblyNumbers={showAssemblyNumbers}
             selectedAssemblyMark={selectedAssemblyMark}
             onSelectAssembly={selectAssembly}
+            onSelectElevation={selectElevationFromPlan}
           />
         </aside>
       </section>
@@ -850,6 +956,9 @@ function LayoutStep({
   updateSizingMode,
   updateCustomSize,
   updateDoor,
+  updateCorner,
+  cornerSightline,
+  onShowFloorPlan,
   onSelectColumnAssembly
 }: {
   input: ElevationInput;
@@ -859,6 +968,9 @@ function LayoutStep({
   updateSizingMode: (axis: LayoutAxis, mode: LayoutSizingMode) => void;
   updateCustomSize: (axis: LayoutAxis, index: number, value: number | null) => void;
   updateDoor: (patch: Partial<DoorConfig>) => void;
+  updateCorner: (patch: Partial<CornerConfig>) => void;
+  cornerSightline: number;
+  onShowFloorPlan: () => void;
   onSelectColumnAssembly: (columnIndex: number) => void;
 }) {
   const doorColumnIndex =
@@ -884,6 +996,42 @@ function LayoutStep({
       </div>
       {input.doorConfig.hasDoor && (
         <p className="layout-note">One door set can occupy each left-to-right bay. Door package details live on the Door tab.</p>
+      )}
+      <Segmented
+        label="Corner"
+        value={input.cornerConfig.hasCorner ? "yes" : "no"}
+        options={[
+          { value: "no", label: "No" },
+          { value: "yes", label: "Yes" }
+        ]}
+        onChange={(value) => updateCorner({ hasCorner: value === "yes" })}
+      />
+      {input.cornerConfig.hasCorner && (
+        <>
+          <Segmented
+            label="Corner side"
+            value={input.cornerConfig.side}
+            options={[
+              { value: "left", label: "Left" },
+              { value: "right", label: "Right" }
+            ]}
+            onChange={(value) => updateCorner({ side: value as CornerSide, hasCorner: true })}
+          />
+          <div className="result-band stacked">
+            <strong>90 degree corner</strong>
+            <span>Corner mullion sightline assumed at {formatInches(cornerSightline)}. The return elevation inherits this job's horizontal pattern.</span>
+          </div>
+          <button
+            type="button"
+            className="secondary-button wide"
+            onClick={() => {
+              if (!input.cornerConfig.linkedElevationId) updateCorner({ hasCorner: true });
+              onShowFloorPlan();
+            }}
+          >
+            Show floor plan selector
+          </button>
+        </>
       )}
       {input.doorConfig.hasDoor && input.rows > 1 && (
         <Segmented
@@ -1253,15 +1401,25 @@ function OutputStep({
 
 function ElevationPreview({
   elevation,
+  cornerPlan,
+  previewMode,
   showAssemblyNumbers,
   selectedAssemblyMark,
-  onSelectAssembly
+  onSelectAssembly,
+  onSelectElevation
 }: {
   elevation: Elevation;
+  cornerPlan: CornerPlanContext | null;
+  previewMode: PreviewMode;
   showAssemblyNumbers: boolean;
   selectedAssemblyMark: string | null;
   onSelectAssembly: (mark: string, type: AssemblySelectionType) => void;
+  onSelectElevation: (elevationId: string) => void;
 }) {
+  if (previewMode === "plan" && cornerPlan) {
+    return <CornerPlanPreview plan={cornerPlan} onSelectElevation={onSelectElevation} />;
+  }
+
   const geometry = elevation.computedGeometry;
   const viewBox = `-6 -16 ${Math.max(geometry.frameWidth + 12, 1)} ${Math.max(geometry.frameHeight + 22, 1)}`;
   const doorGlassCallouts = getDoorGlassCalloutMap(elevation.computedGlass.items);
@@ -1434,6 +1592,113 @@ function ElevationPreview({
           </text>
         ))}
       </svg>
+    </section>
+  );
+}
+
+function CornerPlanPreview({
+  plan,
+  onSelectElevation
+}: {
+  plan: CornerPlanContext;
+  onSelectElevation: (elevationId: string) => void;
+}) {
+  const primaryWidth = Math.max(plan.primaryElevation.computedGeometry.frameWidth, 1);
+  const returnWidth = Math.max(plan.returnElevation?.computedGeometry.frameWidth ?? primaryWidth * 0.65, 1);
+  const profileWidth = Math.max(plan.cornerSightline, 2);
+  const padding = Math.max(profileWidth * 4, 18);
+  const cornerX = plan.side === "left" ? 0 : primaryWidth;
+  const returnX = plan.side === "left" ? -profileWidth : primaryWidth;
+  const viewX = plan.side === "left" ? -padding - profileWidth : -padding;
+  const viewY = -returnWidth - padding;
+  const viewWidth = primaryWidth + padding * 2 + profileWidth;
+  const viewHeight = returnWidth + padding * 2 + profileWidth;
+  const primaryActive = plan.activeElevationId === plan.primaryElevation.id;
+  const returnActive = plan.returnElevation ? plan.activeElevationId === plan.returnElevation.id : false;
+
+  return (
+    <section className="drawing-preview">
+      <div className="preview-header">
+        <strong>Corner Floor Plan</strong>
+        <span>{plan.angle} degree {plan.side} return</span>
+      </div>
+      <svg viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`} role="img" aria-label="Corner floor plan selector">
+        <line x1={0} y1={profileWidth + 10} x2={primaryWidth} y2={profileWidth + 10} className="svg-plan-datum" />
+        <line x1={cornerX} y1={0} x2={cornerX} y2={-returnWidth} className="svg-plan-datum" />
+        <rect
+          x={0}
+          y={0}
+          width={primaryWidth}
+          height={profileWidth}
+          className={`svg-plan-leg ${primaryActive ? "selected" : ""}`}
+        />
+        <rect
+          x={returnX}
+          y={-returnWidth}
+          width={profileWidth}
+          height={returnWidth}
+          className={`svg-plan-leg ${returnActive ? "selected" : ""}`}
+        />
+        <rect
+          x={plan.side === "left" ? -profileWidth : primaryWidth}
+          y={0}
+          width={profileWidth}
+          height={profileWidth}
+          className="svg-plan-corner"
+        />
+        <rect
+          x={0}
+          y={-profileWidth * 1.8}
+          width={primaryWidth}
+          height={profileWidth * 4}
+          className="svg-plan-hit-area"
+          role="button"
+          tabIndex={0}
+          aria-label={`Edit ${plan.primaryElevation.name}`}
+          onClick={() => onSelectElevation(plan.primaryElevation.id)}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" || event.key === " ") onSelectElevation(plan.primaryElevation.id);
+          }}
+        />
+        {plan.returnElevation && (
+          <rect
+            x={returnX - profileWidth * 1.5}
+            y={-returnWidth}
+            width={profileWidth * 4}
+            height={returnWidth}
+            className="svg-plan-hit-area"
+            role="button"
+            tabIndex={0}
+            aria-label={`Edit ${plan.returnElevation.name}`}
+            onClick={() => onSelectElevation(plan.returnElevation!.id)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") onSelectElevation(plan.returnElevation!.id);
+            }}
+          />
+        )}
+        <text x={primaryWidth / 2} y={-6} className="svg-plan-label" textAnchor="middle">
+          {primaryActive ? "Editing " : ""}E1
+        </text>
+        {plan.returnElevation && (
+          <text
+            x={plan.side === "left" ? returnX - 7 : returnX + profileWidth + 7}
+            y={-returnWidth / 2}
+            className="svg-plan-label"
+            textAnchor={plan.side === "left" ? "end" : "start"}
+          >
+            {returnActive ? "Editing " : ""}E2
+          </text>
+        )}
+        <text
+          x={plan.side === "left" ? -profileWidth - 4 : primaryWidth + profileWidth + 4}
+          y={-6}
+          className="svg-plan-corner-label"
+          textAnchor={plan.side === "left" ? "end" : "start"}
+        >
+          Corner {formatInches(plan.cornerSightline)}
+        </text>
+      </svg>
+      <p className="layout-note">Tap a leg to edit that elevation. Horizontal rows stay tied to the first elevation pattern.</p>
     </section>
   );
 }
@@ -1836,11 +2101,137 @@ function toInput(elevation: Elevation): ElevationInput {
       rowPlacement: elevation.doorConfig.rowPlacement ?? "above",
       columnIndex: normalizedDoorColumn
     },
+    cornerConfig: normalizeCornerConfig(elevation.cornerConfig),
     finishConfig: elevation.finishConfig,
     glassConfig: elevation.glassConfig,
     systemRulePackId: elevation.systemRulePackId,
     assemblyType: elevation.assemblyType
   });
+}
+
+function normalizeCornerConfig(cornerConfig?: Partial<CornerConfig>): CornerConfig {
+  const side = cornerConfig?.side === "left" ? "left" : "right";
+  const angle = Number.isFinite(cornerConfig?.angle) && cornerConfig?.angle ? Number(cornerConfig.angle) : 90;
+  return {
+    ...defaultCornerConfig,
+    ...cornerConfig,
+    hasCorner: Boolean(cornerConfig?.hasCorner),
+    side,
+    angle,
+    linkedElevationId: cornerConfig?.hasCorner ? cornerConfig.linkedElevationId : undefined
+  };
+}
+
+function getFirstElevationTemplate(job: Job, savedElevations: Elevation[], currentInput: ElevationInput): ElevationInput {
+  const firstElevationId = job.elevationIds[0] ?? currentInput.id;
+  if (firstElevationId === currentInput.id) return currentInput;
+  const savedTemplate = savedElevations.find((item) => item.id === firstElevationId && item.jobId === job.id);
+  return savedTemplate ? toInput(savedTemplate) : currentInput;
+}
+
+function inheritHorizontalPattern(
+  target: ElevationInput,
+  template: ElevationInput,
+  overrides: Partial<ElevationInput> = {}
+): ElevationInput {
+  return normalizeLayoutSizingInput({
+    ...target,
+    rows: template.rows,
+    rowSizingMode: template.rowSizingMode,
+    rowHeights: resizeCustomSizingInputs(template.rowHeights, template.rows),
+    finishConfig: template.finishConfig,
+    glassConfig: template.glassConfig,
+    systemRulePackId: template.systemRulePackId,
+    assemblyType: template.assemblyType,
+    doorConfig: {
+      ...target.doorConfig,
+      rowPlacement: template.doorConfig.rowPlacement
+    },
+    ...overrides
+  });
+}
+
+function createCornerReturnElevationInput(
+  source: ElevationInput,
+  id: string,
+  sourceFrameHeight: number,
+  storefrontRulePack: StorefrontRulePack
+): ElevationInput {
+  const sideLabel = source.cornerConfig.side === "left" ? "Left" : "Right";
+  const matchingOpeningHeight = roundDimension(
+    sourceFrameHeight + storefrontRulePack.perimeterJoints.head + storefrontRulePack.perimeterJoints.sill
+  );
+  return normalizeLayoutSizingInput({
+    ...source,
+    id,
+    name: `${sideLabel} return elevation`,
+    measurementSet: createSquaredMeasurementSet(source.measurementSet.widthCenter, matchingOpeningHeight),
+    columnSizingMode: "equal",
+    columnWidths: buildBlankSizingInputs(source.columns),
+    doorConfig: createNoDoorConfig(source.doorConfig),
+    cornerConfig: {
+      hasCorner: true,
+      side: oppositeCornerSide(source.cornerConfig.side),
+      angle: 90,
+      linkedElevationId: source.id
+    }
+  });
+}
+
+function createNoDoorConfig(source: DoorConfig): DoorConfig {
+  return {
+    ...source,
+    hasDoor: false,
+    doorType: "none",
+    columnIndex: null,
+    hardwareNoteIds: [],
+    doorSetCount: 0,
+    doorSets: []
+  };
+}
+
+function oppositeCornerSide(side: CornerSide): CornerSide {
+  return side === "left" ? "right" : "left";
+}
+
+function getCornerMullionSightline(storefrontRulePack: StorefrontRulePack): number {
+  return storefrontRulePack.sightlines.cornerMullion ?? storefrontRulePack.nominalFaceWidth * 2;
+}
+
+function getCornerPlanContext(
+  elevations: Elevation[],
+  activeElevation: Elevation,
+  storefrontRulePack: StorefrontRulePack
+): CornerPlanContext | null {
+  const activeCorner = normalizeCornerConfig(activeElevation.cornerConfig);
+  if (activeCorner.hasCorner) {
+    return {
+      primaryElevation: activeElevation,
+      returnElevation: activeCorner.linkedElevationId
+        ? elevations.find((item) => item.id === activeCorner.linkedElevationId) ?? null
+        : null,
+      side: activeCorner.side,
+      angle: activeCorner.angle,
+      cornerSightline: getCornerMullionSightline(storefrontRulePack),
+      activeElevationId: activeElevation.id
+    };
+  }
+
+  const parentElevation = elevations.find((item) => normalizeCornerConfig(item.cornerConfig).linkedElevationId === activeElevation.id);
+  if (!parentElevation) return null;
+  const parentCorner = normalizeCornerConfig(parentElevation.cornerConfig);
+  return {
+    primaryElevation: parentElevation,
+    returnElevation: activeElevation,
+    side: parentCorner.side,
+    angle: parentCorner.angle,
+    cornerSightline: getCornerMullionSightline(storefrontRulePack),
+    activeElevationId: activeElevation.id
+  };
+}
+
+function createId(prefix: string): string {
+  return `${prefix}-${crypto.randomUUID?.() ?? Date.now()}`;
 }
 
 function unique(values: string[]): string[] {
@@ -2193,9 +2584,10 @@ function normalizeLayoutSizingInput(
   preferredIndex?: number
 ): ElevationInput {
   const doorConfig = normalizeDoorConfig(input.doorConfig, input.rows, input.columns);
+  const cornerConfig = normalizeCornerConfig(input.cornerConfig);
   const columnDoorIndex =
     doorConfig.columnIndex ?? getDoorColumnIndex(Math.max(input.columns, 1), doorConfig.locationMode);
-  const normalizedInput = { ...input, doorConfig };
+  const normalizedInput = { ...input, doorConfig, cornerConfig };
 
   return {
     ...normalizedInput,

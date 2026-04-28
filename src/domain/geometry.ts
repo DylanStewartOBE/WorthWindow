@@ -1708,6 +1708,9 @@ function buildNotes(
     ...(entranceRules?.notes ?? []),
     noteLibrary.finish[input.finishConfig.finishId],
     noteLibrary.glass[input.glassConfig.glassTypeId],
+    input.cornerConfig.hasCorner
+      ? `Corner condition: ${input.cornerConfig.angle} degree ${input.cornerConfig.side} return with corner mullion sightline assumed at ${getCornerMullionSightline(storefrontRules)} in.`
+      : undefined,
     input.doorConfig.swing ? noteLibrary.hardware[input.doorConfig.swing] : undefined,
     input.doorConfig.hingeType ? noteLibrary.hardware[input.doorConfig.hingeType] : undefined,
     ...input.doorConfig.hardwareNoteIds.map((id) => noteLibrary.hardware[id]),
@@ -1715,4 +1718,8 @@ function buildNotes(
   ];
 
   return Array.from(new Set(notes.filter((note): note is string => Boolean(note))));
+}
+
+function getCornerMullionSightline(storefrontRules: StorefrontRulePack): number {
+  return storefrontRules.sightlines.cornerMullion ?? storefrontRules.nominalFaceWidth * 2;
 }

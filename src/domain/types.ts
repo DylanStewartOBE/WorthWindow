@@ -6,6 +6,7 @@ export type DoorLocationMode = "center" | "left" | "right" | "custom";
 export type DoorRowPlacement = "above" | "below";
 export type DoorSwing = "inswing" | "outswing";
 export type HingeType = "butt" | "pivot" | "continuous-gear" | "center-hung";
+export type CornerSide = "left" | "right";
 export type ValidationSeverity = "info" | "warning" | "error";
 export type JobStatus = "active" | "archived";
 export type LiteType = "fixed" | "sidelite" | "transom" | "door-adjacent-lite";
@@ -79,6 +80,13 @@ export interface GlassConfig {
   glassTypeLabel: string;
 }
 
+export interface CornerConfig {
+  hasCorner: boolean;
+  side: CornerSide;
+  angle: number;
+  linkedElevationId?: string;
+}
+
 export interface Job {
   id: string;
   name: string;
@@ -107,6 +115,7 @@ export interface ElevationInput {
   rowHeights: Inches[];
   columnWidths: Inches[];
   doorConfig: DoorConfig;
+  cornerConfig: CornerConfig;
   finishConfig: FinishConfig;
   glassConfig: GlassConfig;
   systemRulePackId: string;
@@ -351,6 +360,7 @@ export interface SightlineConfig {
   leftJamb: Inches;
   rightJamb: Inches;
   verticalMullion: Inches;
+  cornerMullion?: Inches;
   doorJamb: Inches;
   head: Inches;
   sill: Inches;

@@ -63,6 +63,11 @@ export const pairDoorSeedInput: ElevationInput = {
       }
     ]
   },
+  cornerConfig: {
+    hasCorner: false,
+    side: "right",
+    angle: 90
+  },
   finishConfig: {
     finishId: "bronze-anodized",
     finishLabel: "Bronze anodized"
@@ -108,6 +113,11 @@ export const noDoorSeedInput: ElevationInput = {
     thresholdNoteId: "field-verify",
     doorSetCount: 0,
     doorSets: []
+  },
+  cornerConfig: {
+    hasCorner: false,
+    side: "right",
+    angle: 90
   },
   finishConfig: {
     finishId: "clear-anodized",
@@ -173,6 +183,11 @@ export function createBlankElevationInput(jobId: string, createdBy: string): Ele
           thresholdNoteId: "standard-threshold"
         }
       ]
+    },
+    cornerConfig: {
+      hasCorner: false,
+      side: "right",
+      angle: 90
     },
     finishConfig: {
       finishId: "clear-anodized",

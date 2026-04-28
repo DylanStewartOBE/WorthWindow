@@ -216,6 +216,24 @@ describe("FG-2000 calculation engine", () => {
     expect(elevation.computedGeometry.bays[0].width).toBeCloseTo(71.688);
   });
 
+  it("adds a corner note when a 90 degree return is configured", () => {
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        cornerConfig: {
+          hasCorner: true,
+          side: "left",
+          angle: 90,
+          linkedElevationId: "elev-return"
+        }
+      },
+      context
+    );
+
+    expect(elevation.computedGeometry.notes.some((note) => note.includes("90 degree left return"))).toBe(true);
+    expect(elevation.computedGeometry.notes.some((note) => note.includes("3.5 in"))).toBe(true);
+  });
+
   it("keeps one-row three-column no-door glass equal across jamb and mullion conditions", () => {
     const elevation = calculateElevation(
       {

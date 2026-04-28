@@ -56,6 +56,7 @@ export function createRevisionSnapshot(elevation: Elevation, number: string): Re
         rowHeights: structuredClone(elevation.rowHeights),
         columnWidths: structuredClone(elevation.columnWidths),
         doorConfig: structuredClone(elevation.doorConfig),
+        cornerConfig: structuredClone(elevation.cornerConfig),
         finishConfig: structuredClone(elevation.finishConfig),
         glassConfig: structuredClone(elevation.glassConfig),
         systemRulePackId: elevation.systemRulePackId,

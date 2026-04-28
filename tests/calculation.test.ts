@@ -234,6 +234,34 @@ describe("FG-2000 calculation engine", () => {
     expect(elevation.computedGeometry.notes.some((note) => note.includes("3.5 in"))).toBe(true);
   });
 
+  it("can preserve a source door-line row height on a no-door corner return", () => {
+    const source = calculateElevation(pairDoorSeedInput, context);
+    const matchingOpeningHeight =
+      source.computedGeometry.frameHeight +
+      defaultStorefrontRulePack.perimeterJoints.head +
+      defaultStorefrontRulePack.perimeterJoints.sill;
+    const returnElevation = calculateElevation(
+      {
+        ...pairDoorSeedInput,
+        measurementSet: createSquaredMeasurementSet(pairDoorSeedInput.measurementSet.widthCenter, matchingOpeningHeight),
+        rowSizingMode: "custom",
+        rowHeights: [source.computedGeometry.rowHeights[0], 0],
+        doorConfig: {
+          ...pairDoorSeedInput.doorConfig,
+          hasDoor: false,
+          doorType: "none",
+          columnIndex: null,
+          doorSetCount: 0,
+          doorSets: []
+        }
+      },
+      context
+    );
+
+    expect(returnElevation.computedGeometry.frameHeight).toBeCloseTo(source.computedGeometry.frameHeight);
+    expect(returnElevation.computedGeometry.rowHeights[0]).toBeCloseTo(source.computedGeometry.rowHeights[0]);
+  });
+
   it("keeps one-row three-column no-door glass equal across jamb and mullion conditions", () => {
     const elevation = calculateElevation(
       {

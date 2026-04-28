@@ -42,6 +42,7 @@ import type {
   CornerSide,
   DoorConfig,
   DoorSetConfig,
+  ComputedGeometry,
   Elevation,
   ElevationInput,
   EntranceRulePack,
@@ -304,7 +305,14 @@ export function App() {
     const nextElevation = savedElevations.find((item) => item.id === elevationId);
     if (!nextElevation) return;
     const nextJob = normalizeJob({ ...job, activeElevationId: elevationId });
-    setInput(toInput(nextElevation));
+    const baseInput = toInput(nextElevation);
+    const nextInput = inheritCornerReturnPatternOnLoad(baseInput, nextJob, savedElevations);
+    setInput(nextInput);
+    if (nextInput !== baseInput) {
+      const syncedElevation = calculateElevation(nextInput, calculationContext);
+      setSavedElevations((current) => uniqueById([...current, syncedElevation]));
+      repository.saveElevation(syncedElevation).catch(() => setStatus("Corner return is in memory until local storage is available"));
+    }
     saveJobState(nextJob, `Loaded ${nextElevation.name}`);
     setPdfUrls({});
   };
@@ -383,18 +391,27 @@ export function App() {
     });
     const calculatedCurrent = calculateElevation(nextInput, calculationContext);
     const existingReturn = savedElevations.find((item) => item.id === linkedElevationId);
+    const baseReturnInput = existingReturn
+      ? toInput(existingReturn)
+      : createCornerReturnElevationInput(
+          nextInput,
+          linkedElevationId,
+          calculatedCurrent.computedGeometry.frameHeight,
+          config.storefrontRulePack
+        );
+    const inheritedRowHeights = buildInheritedRowHeightInputs(calculatedCurrent.computedGeometry.rowHeights);
     const returnInput = normalizeLayoutSizingInput(
       inheritHorizontalPattern(
-        existingReturn
-          ? toInput(existingReturn)
-          : createCornerReturnElevationInput(
-              nextInput,
-              linkedElevationId,
-              calculatedCurrent.computedGeometry.frameHeight,
-              config.storefrontRulePack
-            ),
+        baseReturnInput,
         nextInput,
         {
+          measurementSet: createSquaredMeasurementSet(
+            baseReturnInput.measurementSet.widthCenter,
+            getMatchingOpeningHeightFromGeometry(calculatedCurrent.computedGeometry)
+          ),
+          rows: calculatedCurrent.computedGeometry.rowHeights.length,
+          rowSizingMode: "custom",
+          rowHeights: inheritedRowHeights,
           cornerConfig: {
             hasCorner: true,
             side: oppositeCornerSide(nextInput.cornerConfig.side),
@@ -1025,7 +1042,7 @@ function LayoutStep({
             type="button"
             className="secondary-button wide"
             onClick={() => {
-              if (!input.cornerConfig.linkedElevationId) updateCorner({ hasCorner: true });
+              updateCorner({ hasCorner: true });
               onShowFloorPlan();
             }}
           >
@@ -2149,6 +2166,46 @@ function inheritHorizontalPattern(
     },
     ...overrides
   });
+}
+
+function inheritCornerReturnPatternOnLoad(
+  input: ElevationInput,
+  job: Job,
+  savedElevations: Elevation[]
+): ElevationInput {
+  const cornerConfig = normalizeCornerConfig(input.cornerConfig);
+  if (!cornerConfig.hasCorner || !cornerConfig.linkedElevationId) return input;
+
+  const inputIndex = job.elevationIds.indexOf(input.id);
+  const linkedIndex = job.elevationIds.indexOf(cornerConfig.linkedElevationId);
+  if (inputIndex < 0 || linkedIndex < 0 || linkedIndex >= inputIndex) return input;
+
+  const sourceElevation = savedElevations.find((item) => item.id === cornerConfig.linkedElevationId);
+  if (!sourceElevation) return input;
+
+  return normalizeLayoutSizingInput({
+    ...input,
+    measurementSet: createSquaredMeasurementSet(
+      input.measurementSet.widthCenter,
+      getMatchingOpeningHeightFromGeometry(sourceElevation.computedGeometry)
+    ),
+    rows: sourceElevation.computedGeometry.rowHeights.length,
+    rowSizingMode: "custom",
+    rowHeights: buildInheritedRowHeightInputs(sourceElevation.computedGeometry.rowHeights)
+  });
+}
+
+function buildInheritedRowHeightInputs(rowHeights: number[]): number[] {
+  const count = Math.max(1, rowHeights.length);
+  if (count === 1) return buildBlankSizingInputs(count);
+
+  return Array.from({ length: count }, (_, index) =>
+    index < count - 1 ? roundDimension(rowHeights[index] ?? 0) : 0
+  );
+}
+
+function getMatchingOpeningHeightFromGeometry(geometry: ComputedGeometry): number {
+  return roundDimension(geometry.frameHeight + geometry.perimeterJoints.head + geometry.perimeterJoints.sill);
 }
 
 function createCornerReturnElevationInput(

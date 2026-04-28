@@ -519,10 +519,42 @@ h2 {
   font-size: 0.86rem;
 }
 
+.preview-header-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  min-width: 0;
+}
+
 .preview-header span {
   color: #64748b;
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.preview-toggle {
+  display: inline-grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+.preview-toggle button {
+  min-height: 28px;
+  border: 0;
+  border-radius: 0;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.68rem;
+  font-weight: 900;
+  padding: 4px 7px;
+}
+
+.preview-toggle button.selected {
+  background: #dfead7;
+  color: #48652f;
 }
 
 .drawing-preview svg {
@@ -637,6 +669,15 @@ h2 {
   fill: rgba(255, 255, 255, 0.001);
   pointer-events: all;
   stroke: transparent;
+}
+
+.svg-plan-hit-area-line {
+  cursor: pointer;
+  fill: none;
+  pointer-events: stroke;
+  stroke: rgba(255, 255, 255, 0.001);
+  stroke-width: 12px;
+  vector-effect: non-scaling-stroke;
 }
 
 .svg-plan-hit-area:focus-visible {

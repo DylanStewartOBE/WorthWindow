@@ -169,14 +169,17 @@ describe("FG-2000 calculation engine", () => {
     expect(quote.openingSquareFeet).toBe(134.66);
     expect(quote.doorOpeningSquareFeet).toBe(42);
     expect(quote.quotedStorefrontSquareFeet).toBe(92.66);
-    expect(quote.installedRatePerSquareFoot).toBe(50);
-    expect(quote.installedCost).toBe(4633);
+    expect(quote.glassSquareFeet).toBe(110.73);
+    expect(quote.glassCost).toBe(1384.13);
+    expect(quote.aluminumLinearFeet).toBe(72.94);
+    expect(quote.aluminumCost).toBe(565.29);
     expect(quote.highHeavyGlassSquareFeet).toBe(58.42);
     expect(quote.highHeavyGlassPremiumCost).toBe(584.2);
+    expect(quote.lowHeavyGlassSquareFeet).toBe(0);
     expect(quote.singleDoorCount).toBe(0);
     expect(quote.pairDoorCount).toBe(1);
     expect(quote.doorCost).toBe(4500);
-    expect(quote.total).toBe(9717.2);
+    expect(quote.total).toBe(7033.62);
   });
 
   it("uses the selected second row as the transom row above an 84 inch door", () => {

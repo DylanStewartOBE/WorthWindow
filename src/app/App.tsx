@@ -57,8 +57,8 @@ import { createBlankElevationInput, createBlankJob, noDoorSeedInput, pairDoorSee
 import { createRepository } from "../persistence/database";
 import {
   downloadBlob,
-  generateDrawingPackagePdf,
-  generateQuotePdf,
+  generateJobDrawingPackagePdf,
+  generateJobQuotePdf,
   pdfFileName
 } from "../pdf/pdfGenerator";
 
@@ -107,15 +107,24 @@ type AssemblyRegion = {
 };
 
 type CornerPlanContext = {
-  primaryElevation: Elevation;
-  primaryLabel: string;
-  returnElevation: Elevation | null;
-  returnLabel: string | null;
-  side: CornerSide;
-  angle: number;
-  condition: CornerCondition;
+  segments: PlanSegment[];
+  corners: PlanCorner[];
   cornerSightline: number;
   activeElevationId: string;
+};
+
+type PlanSegment = {
+  elevation: Elevation;
+  label: string;
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+};
+
+type PlanCorner = {
+  x: number;
+  y: number;
 };
 
 const initialConfig: ConfigState = {
@@ -170,7 +179,7 @@ export function App() {
     return merged.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999) || a.name.localeCompare(b.name));
   }, [elevation, input.jobId, job, savedElevations]);
   const cornerPlan = useMemo(
-    () => getCornerPlanContext(jobElevations, elevation, config.storefrontRulePack),
+    () => getJobPlanContext(jobElevations, elevation, config.storefrontRulePack),
     [config.storefrontRulePack, elevation, jobElevations]
   );
   const activeJobs = useMemo(() => savedJobs.filter((savedJob) => normalizeJob(savedJob).status !== "archived"), [savedJobs]);
@@ -615,27 +624,27 @@ export function App() {
   };
 
   const generatePdfs = () => {
-    const packageBlob = generateDrawingPackagePdf(elevation, job, config.branding, { showAssemblyNumbers });
-    const packageUrl = downloadBlob(packageBlob, pdfFileName(job, elevation, "package"));
+    const packageBlob = generateJobDrawingPackagePdf(jobElevations, job, config.branding, { showAssemblyNumbers });
+    const packageUrl = downloadBlob(packageBlob, pdfFileName(job, null, "package"));
     setPdfUrls((current) => ({ ...current, package: packageUrl }));
-    setStatus("PDF package generated");
+    setStatus("Job PDF package generated");
   };
 
   const generateQuote = () => {
-    const quoteBlob = generateQuotePdf(elevation, job, config.branding);
-    const quoteUrl = downloadBlob(quoteBlob, pdfFileName(job, elevation, "quote"));
+    const quoteBlob = generateJobQuotePdf(jobElevations, job, config.branding);
+    const quoteUrl = downloadBlob(quoteBlob, pdfFileName(job, null, "quote"));
     setPdfUrls((current) => ({ ...current, quote: quoteUrl }));
-    setStatus("Customer quote generated");
+    setStatus("Job customer quote generated");
   };
 
   const sharePackage = async () => {
-    const packageBlob = generateDrawingPackagePdf(elevation, job, config.branding, { showAssemblyNumbers });
+    const packageBlob = generateJobDrawingPackagePdf(jobElevations, job, config.branding, { showAssemblyNumbers });
     const files = [
-      new File([packageBlob], pdfFileName(job, elevation, "package"), { type: "application/pdf" })
+      new File([packageBlob], pdfFileName(job, null, "package"), { type: "application/pdf" })
     ];
 
     if ("canShare" in navigator && navigator.canShare?.({ files })) {
-      await navigator.share({ title: `${job.number} ${elevation.name}`, files });
+      await navigator.share({ title: `${job.number} drawing package`, files });
       setStatus("Shared PDF package");
     } else {
       generatePdfs();
@@ -788,6 +797,7 @@ export function App() {
             jobElevations={jobElevations}
             cornerPlan={cornerPlan}
             previewMode={previewMode}
+            onPreviewModeChange={setPreviewMode}
             showAssemblyNumbers={showAssemblyNumbers}
             selectedAssemblyMark={selectedAssemblyMark}
             onSelectAssembly={selectAssembly}
@@ -1419,13 +1429,13 @@ function OutputStep({
       {pdfUrls.package && (
         <div className="result-band stacked">
           <strong>Generated package</strong>
-          <a href={pdfUrls.package} target="_blank" rel="noreferrer">{pdfFileName(job, elevation, "package")}</a>
+          <a href={pdfUrls.package} target="_blank" rel="noreferrer">{pdfFileName(job, null, "package")}</a>
         </div>
       )}
       {pdfUrls.quote && (
         <div className="result-band stacked">
           <strong>Generated quote</strong>
-          <a href={pdfUrls.quote} target="_blank" rel="noreferrer">{pdfFileName(job, elevation, "quote")}</a>
+          <a href={pdfUrls.quote} target="_blank" rel="noreferrer">{pdfFileName(job, null, "quote")}</a>
         </div>
       )}
       <div className="sample-actions">
@@ -1445,6 +1455,7 @@ function ElevationPreview({
   jobElevations,
   cornerPlan,
   previewMode,
+  onPreviewModeChange,
   showAssemblyNumbers,
   selectedAssemblyMark,
   onSelectAssembly,
@@ -1454,13 +1465,14 @@ function ElevationPreview({
   jobElevations: Elevation[];
   cornerPlan: CornerPlanContext | null;
   previewMode: PreviewMode;
+  onPreviewModeChange: (mode: PreviewMode) => void;
   showAssemblyNumbers: boolean;
   selectedAssemblyMark: string | null;
   onSelectAssembly: (mark: string, type: AssemblySelectionType) => void;
   onSelectElevation: (elevationId: string) => void;
 }) {
   if (previewMode === "plan" && cornerPlan) {
-    return <CornerPlanPreview plan={cornerPlan} onSelectElevation={onSelectElevation} />;
+    return <CornerPlanPreview plan={cornerPlan} onSelectElevation={onSelectElevation} onPreviewModeChange={onPreviewModeChange} />;
   }
 
   const geometry = elevation.computedGeometry;
@@ -1482,7 +1494,15 @@ function ElevationPreview({
     <section className="drawing-preview">
       <div className="preview-header">
         <strong>Elevation Preview</strong>
-        <span>{formatFeetInches(geometry.frameWidth)} x {formatFeetInches(geometry.frameHeight)}</span>
+        <div className="preview-header-actions">
+          <span>{formatFeetInches(geometry.frameWidth)} x {formatFeetInches(geometry.frameHeight)}</span>
+          {cornerPlan && (
+            <div className="preview-toggle" aria-label="Preview mode">
+              <button type="button" className="selected" onClick={() => onPreviewModeChange("elevation")}>Elevation</button>
+              <button type="button" onClick={() => onPreviewModeChange("plan")}>Plan</button>
+            </div>
+          )}
+        </div>
       </div>
       <svg viewBox={viewBox} role="img" aria-label="Computed storefront elevation">
         <rect x="0" y="0" width={geometry.frameWidth} height={geometry.frameHeight} className="svg-frame" />
@@ -1653,107 +1673,78 @@ function ElevationPreview({
 
 function CornerPlanPreview({
   plan,
-  onSelectElevation
+  onSelectElevation,
+  onPreviewModeChange
 }: {
   plan: CornerPlanContext;
   onSelectElevation: (elevationId: string) => void;
+  onPreviewModeChange: (mode: PreviewMode) => void;
 }) {
-  const primaryWidth = Math.max(plan.primaryElevation.computedGeometry.frameWidth, 1);
-  const returnWidth = Math.max(plan.returnElevation?.computedGeometry.frameWidth ?? primaryWidth * 0.65, 1);
   const profileWidth = Math.max(plan.cornerSightline, 2);
   const padding = Math.max(profileWidth * 4, 18);
-  const cornerX = plan.side === "left" ? 0 : primaryWidth;
-  const returnX = plan.side === "left" ? -profileWidth : primaryWidth;
-  const returnGoesUp = plan.condition === "outside";
-  const returnY = returnGoesUp ? -returnWidth : 0;
-  const viewX = plan.side === "left" ? -padding - profileWidth : -padding;
-  const viewY = returnGoesUp ? -returnWidth - padding : -padding;
-  const viewWidth = primaryWidth + padding * 2 + profileWidth;
-  const viewHeight = returnWidth + padding * 2 + profileWidth;
-  const primaryActive = plan.activeElevationId === plan.primaryElevation.id;
-  const returnActive = plan.returnElevation ? plan.activeElevationId === plan.returnElevation.id : false;
+  const xs = plan.segments.flatMap((segment) => [segment.x1, segment.x2]);
+  const ys = plan.segments.flatMap((segment) => [segment.y1, segment.y2]);
+  const minX = Math.min(...xs, ...plan.corners.map((corner) => corner.x)) - padding;
+  const maxX = Math.max(...xs, ...plan.corners.map((corner) => corner.x)) + padding;
+  const minY = Math.min(...ys, ...plan.corners.map((corner) => corner.y)) - padding;
+  const maxY = Math.max(...ys, ...plan.corners.map((corner) => corner.y)) + padding;
 
   return (
     <section className="drawing-preview">
       <div className="preview-header">
-        <strong>Corner Floor Plan</strong>
-        <span>{plan.angle} degree {plan.condition} corner</span>
+        <strong>Plan View</strong>
+        <div className="preview-header-actions">
+          <span>{plan.segments.length} elevation{plan.segments.length === 1 ? "" : "s"}</span>
+          <div className="preview-toggle" aria-label="Preview mode">
+            <button type="button" onClick={() => onPreviewModeChange("elevation")}>Elevation</button>
+            <button type="button" className="selected" onClick={() => onPreviewModeChange("plan")}>Plan</button>
+          </div>
+        </div>
       </div>
-      <svg viewBox={`${viewX} ${viewY} ${viewWidth} ${viewHeight}`} role="img" aria-label="Corner floor plan selector">
-        <line x1={0} y1={profileWidth + 10} x2={primaryWidth} y2={profileWidth + 10} className="svg-plan-datum" />
-        <line x1={cornerX} y1={0} x2={cornerX} y2={returnGoesUp ? -returnWidth : returnWidth} className="svg-plan-datum" />
-        <rect
-          x={0}
-          y={0}
-          width={primaryWidth}
-          height={profileWidth}
-          className={`svg-plan-leg ${primaryActive ? "selected" : ""}`}
-        />
-        <rect
-          x={returnX}
-          y={returnY}
-          width={profileWidth}
-          height={returnWidth}
-          className={`svg-plan-leg ${returnActive ? "selected" : ""}`}
-        />
-        <rect
-          x={plan.side === "left" ? -profileWidth : primaryWidth}
-          y={0}
-          width={profileWidth}
-          height={profileWidth}
-          className="svg-plan-corner"
-        />
-        <rect
-          x={0}
-          y={-profileWidth * 1.8}
-          width={primaryWidth}
-          height={profileWidth * 4}
-          className="svg-plan-hit-area"
-          role="button"
-          tabIndex={0}
-          aria-label={`Edit ${plan.primaryElevation.name}`}
-          onClick={() => onSelectElevation(plan.primaryElevation.id)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") onSelectElevation(plan.primaryElevation.id);
-          }}
-        />
-        {plan.returnElevation && (
+      <svg viewBox={`${minX} ${minY} ${Math.max(maxX - minX, 1)} ${Math.max(maxY - minY, 1)}`} role="img" aria-label="Job floor plan selector">
+        {plan.segments.map((segment) => {
+          const active = plan.activeElevationId === segment.elevation.id;
+          const midX = (segment.x1 + segment.x2) / 2;
+          const midY = (segment.y1 + segment.y2) / 2;
+          return (
+            <g key={segment.elevation.id}>
+              <line
+                x1={segment.x1}
+                y1={segment.y1}
+                x2={segment.x2}
+                y2={segment.y2}
+                className={`svg-plan-leg ${active ? "selected" : ""}`}
+              />
+              <line
+                x1={segment.x1}
+                y1={segment.y1}
+                x2={segment.x2}
+                y2={segment.y2}
+                className="svg-plan-hit-area-line"
+                role="button"
+                tabIndex={0}
+                aria-label={`Edit ${segment.elevation.name}`}
+                onClick={() => onSelectElevation(segment.elevation.id)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") onSelectElevation(segment.elevation.id);
+                }}
+              />
+              <text x={midX} y={midY - profileWidth * 1.6} className="svg-plan-label" textAnchor="middle">
+                {segment.label}
+              </text>
+            </g>
+          );
+        })}
+        {plan.corners.map((corner, index) => (
           <rect
-            x={returnX - profileWidth * 1.5}
-            y={returnY}
-            width={profileWidth * 4}
-            height={returnWidth}
-            className="svg-plan-hit-area"
-            role="button"
-            tabIndex={0}
-            aria-label={`Edit ${plan.returnElevation.name}`}
-            onClick={() => onSelectElevation(plan.returnElevation!.id)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" || event.key === " ") onSelectElevation(plan.returnElevation!.id);
-            }}
+            key={`corner-${index}`}
+            x={corner.x - profileWidth / 2}
+            y={corner.y - profileWidth / 2}
+            width={profileWidth}
+            height={profileWidth}
+            className="svg-plan-corner"
           />
-        )}
-        <text x={primaryWidth / 2} y={returnGoesUp ? profileWidth + 9 : -5} className="svg-plan-label" textAnchor="middle">
-          {plan.primaryLabel}
-        </text>
-        {plan.returnElevation && (
-          <text
-            x={returnX + profileWidth / 2}
-            y={returnY + returnWidth / 2}
-            className="svg-plan-label"
-            textAnchor="middle"
-          >
-            {plan.returnLabel}
-          </text>
-        )}
-        <text
-          x={plan.side === "left" ? -profileWidth - 4 : primaryWidth + profileWidth + 4}
-          y={returnGoesUp ? -6 : profileWidth + 9}
-          className="svg-plan-corner-label"
-          textAnchor={plan.side === "left" ? "end" : "start"}
-        >
-          Corner {formatInches(plan.cornerSightline)}
-        </text>
+        ))}
       </svg>
     </section>
   );
@@ -2328,43 +2319,67 @@ function getCornerMullionSightline(storefrontRulePack: StorefrontRulePack): numb
   return storefrontRulePack.sightlines.cornerMullion ?? storefrontRulePack.nominalFaceWidth * 2;
 }
 
-function getCornerPlanContext(
+function getJobPlanContext(
   elevations: Elevation[],
   activeElevation: Elevation,
   storefrontRulePack: StorefrontRulePack
 ): CornerPlanContext | null {
-  const activeCorner = normalizeCornerConfig(activeElevation.cornerConfig);
-  if (activeCorner.hasCorner) {
-    const returnElevation = activeCorner.linkedElevationId
-      ? elevations.find((item) => item.id === activeCorner.linkedElevationId) ?? null
-      : null;
-    return {
-      primaryElevation: activeElevation,
-      primaryLabel: getElevationPlanLabel(elevations, activeElevation.id),
-      returnElevation,
-      returnLabel: returnElevation ? getElevationPlanLabel(elevations, returnElevation.id) : null,
-      side: activeCorner.side,
-      angle: activeCorner.angle,
-      condition: activeCorner.condition,
-      cornerSightline: getCornerMullionSightline(storefrontRulePack),
-      activeElevationId: activeElevation.id
-    };
-  }
+  if (elevations.length === 0) return null;
 
-  const parentElevation = getIncomingCornerParent(activeElevation.id, elevations);
-  if (!parentElevation) return null;
-  const parentCorner = normalizeCornerConfig(parentElevation.cornerConfig);
+  const cornerSightline = getCornerMullionSightline(storefrontRulePack);
+  const segments: PlanSegment[] = [];
+  const corners: PlanCorner[] = [];
+  let start = { x: 0, y: 0 };
+  let direction = { x: 1, y: 0 };
+
+  elevations.forEach((elevation, index) => {
+    const length = Math.max(elevation.computedGeometry.frameWidth, 1);
+    const end = {
+      x: start.x + direction.x * length,
+      y: start.y + direction.y * length
+    };
+
+    segments.push({
+      elevation,
+      label: getElevationPlanLabel(elevations, elevation.id),
+      x1: start.x,
+      y1: start.y,
+      x2: end.x,
+      y2: end.y
+    });
+
+    const corner = normalizeCornerConfig(elevation.cornerConfig);
+    const nextElevation = elevations[index + 1];
+
+    if (corner.hasCorner && nextElevation) {
+      const pivot = corner.side === "right" ? end : start;
+      corners.push(pivot);
+      direction = rotatePlanDirection(direction, corner.condition === "outside" ? "counterclockwise" : "clockwise");
+      start = pivot;
+      return;
+    }
+
+    start = {
+      x: end.x + direction.x * cornerSightline * 3,
+      y: end.y + direction.y * cornerSightline * 3
+    };
+  });
+
   return {
-    primaryElevation: parentElevation,
-    primaryLabel: getElevationPlanLabel(elevations, parentElevation.id),
-    returnElevation: activeElevation,
-    returnLabel: getElevationPlanLabel(elevations, activeElevation.id),
-    side: parentCorner.side,
-    angle: parentCorner.angle,
-    condition: parentCorner.condition,
-    cornerSightline: getCornerMullionSightline(storefrontRulePack),
+    segments,
+    corners,
+    cornerSightline,
     activeElevationId: activeElevation.id
   };
+}
+
+function rotatePlanDirection(
+  direction: { x: number; y: number },
+  turn: "clockwise" | "counterclockwise"
+): { x: number; y: number } {
+  return turn === "clockwise"
+    ? { x: -direction.y, y: direction.x }
+    : { x: direction.y, y: -direction.x };
 }
 
 function createId(prefix: string): string {

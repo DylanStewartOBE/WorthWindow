@@ -1,18 +1,16 @@
 [
   {
-    "elevationId": "elev-pair-door",
-    "elevationName": "Pair doors with sidelites",
-    "files": [
-      "wc-2000-pair-doors-with-sidelites-package-rev-A.pdf"
+    "elevationIds": [
+      "elev-pair-door",
+      "elev-no-door"
     ],
-    "generatedAt": "2026-04-27T20:55:08.424Z"
-  },
-  {
-    "elevationId": "elev-no-door",
-    "elevationName": "Four lite no-door elevation",
-    "files": [
-      "wc-2000-four-lite-no-door-elevation-package-rev-A.pdf"
+    "elevationNames": [
+      "Pair doors with sidelites",
+      "Four lite no-door elevation"
     ],
-    "generatedAt": "2026-04-27T20:55:08.429Z"
+    "files": [
+      "worth-construction_wc-2000_all-elevations_drawing-package_rev-a.pdf"
+    ],
+    "generatedAt": "2026-04-28T13:01:30.892Z"
   }
 ]

@@ -5,12 +5,13 @@ import {
   getDoorGlassCalloutMap,
   getGlassItemSquareFeet,
   getGlassItemWeightPounds,
+  getGlassLineSquareFeet,
   getTotalGlassSquareFeet,
   getTotalGlassWeightPounds
 } from "../domain/glass";
 import { formatFeetInches, formatInches } from "../domain/format";
-import { calculateQuoteSummary } from "../domain/quote";
-import type { BrandingConfig, Elevation, Job, Lite, ValidationFlag } from "../domain/types";
+import { calculateJobQuoteSummary, calculateQuoteSummary } from "../domain/quote";
+import type { BrandingConfig, Elevation, GlassItem, Job, Lite, ValidationFlag } from "../domain/types";
 
 const LETTER_LANDSCAPE = {
   width: 792,
@@ -21,38 +22,66 @@ type PdfGenerationOptions = {
   showAssemblyNumbers?: boolean;
 };
 
+type PdfType = "elevation" | "glass-takeoff" | "package" | "quote";
+
+type GlassTakeoffRow = GlassItem & {
+  elevationLabel: string;
+  elevationName: string;
+  representativeLite?: Lite;
+};
+
+type JobGlassTakeoff = {
+  rows: GlassTakeoffRow[];
+  markByKey: Map<string, string>;
+};
+
 export function generateElevationPdf(elevation: Elevation, job: Job, branding: BrandingConfig, options: PdfGenerationOptions = {}): Blob {
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
-  drawSheetChrome(doc, "ELEVATION", "A-1", elevation, job, branding);
-  drawElevation(doc, elevation, 42, 86, 500, 360, options);
-  drawElevationNotes(doc, elevation, 560, 86, 190);
+  drawSheetChrome(doc, "ELEVATION", "A-1", elevation, job, branding, elevation.name);
+  drawElevation(doc, elevation, 42, 126, 500, 320, options);
+  drawElevationNotes(doc, elevation, 560, 126, 190);
   return doc.output("blob");
 }
 
 export function generateGlassTakeoffPdf(elevation: Elevation, job: Job, branding: BrandingConfig): Blob {
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
-  drawSheetChrome(doc, "GLASS TAKEOFF", "G-1", elevation, job, branding);
-  drawGlassTable(doc, elevation, 42, 96, 710);
+  drawSheetChrome(doc, "GLASS TAKEOFF", "G-1", elevation, job, branding, elevation.name);
+  drawGlassTable(doc, [elevation], 42, 126, 710);
   return doc.output("blob");
 }
 
 export function generateDrawingPackagePdf(elevation: Elevation, job: Job, branding: BrandingConfig, options: PdfGenerationOptions = {}): Blob {
+  return generateJobDrawingPackagePdf([elevation], job, branding, options);
+}
+
+export function generateJobDrawingPackagePdf(elevations: Elevation[], job: Job, branding: BrandingConfig, options: PdfGenerationOptions = {}): Blob {
+  const packageElevations = ensureElevations(elevations);
+  const jobGlassTakeoff = buildJobGlassTakeoff(packageElevations);
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
-  drawSheetChrome(doc, "ELEVATION", "A-1", elevation, job, branding);
-  drawElevation(doc, elevation, 42, 86, 500, 360, options);
-  drawElevationNotes(doc, elevation, 560, 86, 190);
+
+  packageElevations.forEach((elevation, index) => {
+    if (index > 0) doc.addPage("letter", "landscape");
+    drawSheetChrome(doc, "ELEVATION", `A-${index + 1}`, elevation, job, branding, elevation.name);
+    drawElevation(doc, elevation, 42, 126, 500, 320, options, jobGlassTakeoff);
+    drawElevationNotes(doc, elevation, 560, 126, 190);
+  });
 
   doc.addPage("letter", "landscape");
-  drawSheetChrome(doc, "GLASS TAKEOFF", "G-1", elevation, job, branding);
-  drawGlassTable(doc, elevation, 42, 96, 710);
+  drawSheetChrome(doc, "GLASS TAKEOFF", "G-1", packageElevations[0], job, branding, "All elevations");
+  drawGlassTable(doc, packageElevations, 42, 126, 710, jobGlassTakeoff);
 
   return doc.output("blob");
 }
 
 export function generateQuotePdf(elevation: Elevation, job: Job, branding: BrandingConfig): Blob {
+  return generateJobQuotePdf([elevation], job, branding);
+}
+
+export function generateJobQuotePdf(elevations: Elevation[], job: Job, branding: BrandingConfig): Blob {
+  const quoteElevations = ensureElevations(elevations);
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
-  drawSheetChrome(doc, "CUSTOMER QUOTE", "Q-1", elevation, job, branding);
-  drawQuoteSheet(doc, elevation, job, 54, 104, 684);
+  drawSheetChrome(doc, "CUSTOMER QUOTE", "Q-1", quoteElevations[0], job, branding, "All elevations");
+  drawQuoteSheet(doc, quoteElevations, job, 54, 130, 684);
   return doc.output("blob");
 }
 
@@ -65,10 +94,21 @@ export function downloadBlob(blob: Blob, fileName: string): string {
   return url;
 }
 
-export function pdfFileName(job: Job, elevation: Elevation, type: "elevation" | "glass-takeoff" | "package" | "quote"): string {
+export function pdfFileName(job: Job, elevation: Elevation | null, type: PdfType): string {
+  const safeCompany = "worth-construction";
   const safeJob = sanitize(job.number || job.name || "job");
-  const safeElevation = sanitize(elevation.name || elevation.id);
-  return `${safeJob}-${safeElevation}-${type}-rev-${job.activeRevision || "A"}.pdf`;
+  const safeSubject = elevation && (type === "elevation" || type === "glass-takeoff")
+    ? sanitize(elevation.name || elevation.id)
+    : "all-elevations";
+  const safeType = sanitize(type === "package" ? "drawing-package" : type === "quote" ? "customer-quote" : type);
+  return `${safeCompany}_${safeJob}_${safeSubject}_${safeType}_rev-${sanitize(job.activeRevision || "A")}.pdf`;
+}
+
+function ensureElevations(elevations: Elevation[]): Elevation[] {
+  if (elevations.length === 0) {
+    throw new Error("At least one elevation is required to generate a PDF.");
+  }
+  return elevations;
 }
 
 function drawSheetChrome(
@@ -77,10 +117,11 @@ function drawSheetChrome(
   sheetNumber: string,
   elevation: Elevation,
   job: Job,
-  branding: BrandingConfig
+  branding: BrandingConfig,
+  elevationLabel = elevation.name
 ) {
   doc.setProperties({
-    title: `${job.number} ${elevation.name} ${title}`,
+    title: `${job.number} ${elevationLabel} ${title}`,
     subject: "FG-2000 field measure drawing package",
     author: job.createdBy || branding.companyName
   });
@@ -90,20 +131,30 @@ function drawSheetChrome(
   doc.rect(24, 24, LETTER_LANDSCAPE.width - 48, LETTER_LANDSCAPE.height - 48);
 
   doc.setFillColor(...hexToRgb(branding.accentColor, [72, 101, 47]));
-  doc.rect(24, 24, 54, 54, "F");
+  doc.rect(24, 24, LETTER_LANDSCAPE.width - 48, 54, "F");
+  doc.setFillColor(255, 255, 255);
+  doc.rect(38, 34, 34, 34, "F");
   doc.setTextColor(255, 255, 255);
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(18);
-  doc.text(branding.logoText, 51, 57, { align: "center" });
+  doc.setFontSize(21);
+  doc.text(branding.companyName, 90, 47);
+  doc.setFontSize(8);
+  doc.setFont("helvetica", "normal");
+  doc.text("FG-2000 FIELD MEASURE DRAWING PACKAGE", 91, 64);
+
+  doc.setTextColor(...hexToRgb(branding.accentColor, [72, 101, 47]));
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(16);
+  doc.text(branding.logoText, 55, 57, { align: "center" });
 
   doc.setTextColor(17, 24, 39);
-  doc.setFontSize(18);
-  doc.text(title, 96, 46);
+  doc.setFontSize(15);
+  doc.text(title, 42, 102);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
-  doc.text("FG-2000 field measure drawing package", 96, 63);
+  doc.text(elevationLabel, 42, 116);
 
-  drawTitleBlock(doc, elevation, job, branding, sheetNumber);
+  drawTitleBlock(doc, elevation, job, branding, sheetNumber, elevationLabel);
 }
 
 function drawTitleBlock(
@@ -111,7 +162,8 @@ function drawTitleBlock(
   elevation: Elevation,
   job: Job,
   branding: BrandingConfig,
-  sheetNumber: string
+  sheetNumber: string,
+  elevationLabel = elevation.name
 ) {
   const x = 520;
   const y = 472;
@@ -131,7 +183,7 @@ function drawTitleBlock(
     ["JOB NO.", job.number || "-"],
     ["JOB NAME", job.name || "-"],
     ["CUSTOMER", job.customer || "-"],
-    ["ELEVATION", elevation.name],
+    ["ELEVATION", elevationLabel],
     ["REVISION", job.activeRevision || "A"],
     ["SHEET", sheetNumber],
     ["CREATED BY", job.createdBy || "-"],
@@ -154,10 +206,12 @@ function drawElevation(
   y: number,
   maxWidth: number,
   maxHeight: number,
-  options: PdfGenerationOptions = {}
+  options: PdfGenerationOptions = {},
+  jobGlassTakeoff?: JobGlassTakeoff
 ) {
   const geometry = elevation.computedGeometry;
-  const doorGlassCallouts = getDoorGlassCalloutMap(elevation.computedGlass.items);
+  const glassItems = applyJobGlassMarks(elevation.computedGlass.items, jobGlassTakeoff);
+  const doorGlassCallouts = getDoorGlassCalloutMap(glassItems);
   const scale = Math.min(maxWidth / geometry.frameWidth, maxHeight / geometry.frameHeight);
   const drawingWidth = geometry.frameWidth * scale;
   const drawingHeight = geometry.frameHeight * scale;
@@ -214,10 +268,12 @@ function drawElevation(
     drawDoorGlassMarks(doc, door, doorIndex, doorGlassCallouts, originX, originY, geometry.frameHeight, scale);
   });
 
-  geometry.lites.forEach((lite) => drawLiteMark(doc, elevation, lite, originX, originY, scale));
+  geometry.lites.forEach((lite) => drawLiteMark(doc, elevation, lite, originX, originY, scale, jobGlassTakeoff));
   geometry.assemblyCallouts
     .filter((callout) => shouldShowAssemblyCallout(callout, options.showAssemblyNumbers ?? false))
     .forEach((callout) => drawAssemblyCallout(doc, elevation, callout, originX, originY, scale));
+
+  drawDimensionLeaders(doc, elevation, originX, originY, scale);
 
   doc.setDrawColor(75, 85, 99);
   doc.setFont("helvetica", "normal");
@@ -232,6 +288,55 @@ function drawElevation(
       originY + drawingHeight + 18
     );
   }
+}
+
+function drawDimensionLeaders(doc: jsPDF, elevation: Elevation, originX: number, originY: number, scale: number) {
+  const { frameHeight } = elevation.computedGeometry;
+  const dimensions = elevation.computedGeometry.dimensions.filter(
+    (dimension) => dimension.id.startsWith("overall") || dimension.id.startsWith("column") || dimension.id.startsWith("row") || dimension.id.includes("door")
+  );
+
+  doc.setDrawColor(17, 24, 39);
+  doc.setTextColor(17, 24, 39);
+  doc.setLineWidth(0.45);
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(5.8);
+
+  dimensions.forEach((dimension) => {
+    if (dimension.orientation === "horizontal") {
+      const fromX = originX + dimension.from * scale;
+      const toX = originX + dimension.to * scale;
+      const baselineY = originY + (dimension.offset < 0 ? dimension.offset * 1.8 : frameHeight * scale + dimension.offset * 1.8);
+      const extensionTopY = dimension.offset < 0 ? baselineY - 4 : originY + frameHeight * scale;
+      const extensionBottomY = dimension.offset < 0 ? originY : baselineY + 4;
+      doc.line(fromX, extensionTopY, fromX, extensionBottomY);
+      doc.line(toX, extensionTopY, toX, extensionBottomY);
+      doc.line(fromX, baselineY, toX, baselineY);
+      drawDimensionTick(doc, fromX, baselineY);
+      drawDimensionTick(doc, toX, baselineY);
+      doc.text(formatFeetInches(dimension.value), (fromX + toX) / 2, baselineY - 2, { align: "center" });
+      return;
+    }
+
+    const fromY = originY + (frameHeight - dimension.from) * scale;
+    const toY = originY + (frameHeight - dimension.to) * scale;
+    const baselineX = originX + (dimension.offset < 0 ? dimension.offset * 1.8 : elevation.computedGeometry.frameWidth * scale + dimension.offset * 1.8);
+    const extensionLeftX = dimension.offset < 0 ? baselineX - 4 : originX + elevation.computedGeometry.frameWidth * scale;
+    const extensionRightX = dimension.offset < 0 ? originX : baselineX + 4;
+    doc.line(extensionLeftX, fromY, extensionRightX, fromY);
+    doc.line(extensionLeftX, toY, extensionRightX, toY);
+    doc.line(baselineX, fromY, baselineX, toY);
+    drawDimensionTick(doc, baselineX, fromY);
+    drawDimensionTick(doc, baselineX, toY);
+    doc.text(formatFeetInches(dimension.value), baselineX - 2, (fromY + toY) / 2, {
+      align: "center",
+      angle: 90
+    });
+  });
+}
+
+function drawDimensionTick(doc: jsPDF, x: number, y: number) {
+  doc.line(x - 2.5, y + 2.5, x + 2.5, y - 2.5);
 }
 
 function shouldShowAssemblyCallout(
@@ -304,13 +409,24 @@ function drawDoorGlassMarks(
   });
 }
 
-function drawLiteMark(doc: jsPDF, elevation: Elevation, lite: Lite, originX: number, originY: number, scale: number) {
+function drawLiteMark(
+  doc: jsPDF,
+  elevation: Elevation,
+  lite: Lite,
+  originX: number,
+  originY: number,
+  scale: number,
+  jobGlassTakeoff?: JobGlassTakeoff
+) {
   const cx = originX + (lite.dloX + lite.dloWidth / 2) * scale;
   const cy = originY + (elevation.computedGeometry.frameHeight - lite.dloY - lite.dloHeight / 2) * scale;
+  const mark =
+    jobGlassTakeoff?.markByKey.get(glassKey("storefront-lite", lite.glassWidth, lite.glassHeight, elevation.glassConfig.glassTypeLabel)) ??
+    lite.mark;
   doc.setFont("helvetica", "bold");
   doc.setTextColor(17, 24, 39);
   doc.setFontSize(7);
-  doc.text(lite.mark, cx, cy - 3, { align: "center" });
+  doc.text(mark, cx, cy - 3, { align: "center" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(5.8);
   doc.text(`${formatInches(lite.glassWidth)} x ${formatInches(lite.glassHeight)}`, cx, cy + 7, { align: "center" });
@@ -364,17 +480,108 @@ function drawElevationNotes(doc: jsPDF, elevation: Elevation, x: number, y: numb
   drawValidationList(doc, elevation.validationFlags, x, y + 266, width);
 }
 
-function drawGlassTable(doc: jsPDF, elevation: Elevation, x: number, y: number, width: number) {
-  const headers = ["Pic", "Mark", "Location", "Qty", "Width", "Height", "Sq Ft", "Wt/Pc", "Glass", "Safety"];
-  const widths = [50, 38, 104, 30, 56, 56, 46, 58, 214, 48];
+function buildJobGlassTakeoff(elevations: Elevation[]): JobGlassTakeoff {
+  const groups = new Map<
+    string,
+    {
+      key: string;
+      locations: string[];
+      qty: number;
+      width: number;
+      height: number;
+      glassType: string;
+      safetyGlazingLikely: boolean;
+      sourceType: GlassItem["sourceType"];
+      liteId: string;
+      elevationLabel: string;
+      elevationName: string;
+      representativeLite?: Lite;
+    }
+  >();
+
+  elevations.forEach((elevation, elevationIndex) => {
+    const elevationLabel = `E${elevationIndex + 1}`;
+
+    elevation.computedGlass.items.forEach((item) => {
+      const representativeLite =
+        item.sourceType === "storefront-lite"
+          ? elevation.computedGeometry.lites.find((lite) => lite.id === item.liteId)
+          : undefined;
+      const key = glassKey(item.sourceType, item.width, item.height, item.glassType);
+      const location = `${elevationLabel}:${item.location}`;
+      const current = groups.get(key);
+
+      if (current) {
+        current.qty += item.qty;
+        current.locations.push(location);
+        current.safetyGlazingLikely = current.safetyGlazingLikely || item.safetyGlazingLikely;
+        current.representativeLite = current.representativeLite ?? representativeLite;
+        return;
+      }
+
+      groups.set(key, {
+        key,
+        locations: [location],
+        qty: item.qty,
+        width: item.width,
+        height: item.height,
+        glassType: item.glassType,
+        safetyGlazingLikely: item.safetyGlazingLikely,
+        sourceType: item.sourceType,
+        liteId: item.liteId,
+        elevationLabel,
+        elevationName: elevation.name,
+        representativeLite
+      });
+    });
+  });
+
+  let storefrontIndex = 1;
+  let doorIndex = 1;
+  const markByKey = new Map<string, string>();
+
+  const rows = Array.from(groups.values()).map((group) => {
+    const mark = group.sourceType === "door-lite" ? `DG${doorIndex++}` : `G${storefrontIndex++}`;
+    markByKey.set(group.key, mark);
+
+    return {
+      liteId: group.liteId,
+      mark,
+      location: group.locations.join(", "),
+      qty: group.qty,
+      width: group.width,
+      height: group.height,
+      glassType: group.glassType,
+      safetyGlazingLikely: group.safetyGlazingLikely,
+      sourceType: group.sourceType,
+      elevationLabel: group.elevationLabel,
+      elevationName: group.elevationName,
+      representativeLite: group.representativeLite
+    };
+  });
+
+  return { rows, markByKey };
+}
+
+function drawGlassTable(
+  doc: jsPDF,
+  elevations: Elevation[],
+  x: number,
+  y: number,
+  width: number,
+  jobGlassTakeoff = buildJobGlassTakeoff(elevations)
+) {
+  const rows = jobGlassTakeoff.rows;
+  const headers = ["Pic", "Mark", "Location", "Qty", "Width", "Height", "Sq Ft/Pc", "Wt/Pc", "Line Sq Ft", "Glass", "Safety"];
+  const widths = [44, 34, 104, 26, 50, 50, 48, 46, 54, 202, 44];
   const rowHeight = 30;
-  const totalSquareFeet = getTotalGlassSquareFeet(elevation.computedGlass.items);
-  const totalWeight = getTotalGlassWeightPounds(elevation.computedGlass.items);
+  const totalSquareFeet = getTotalGlassSquareFeet(rows);
+  const totalWeight = getTotalGlassWeightPounds(rows);
   let currentY = y;
 
   doc.setFont("helvetica", "bold");
   doc.setFontSize(10);
-  doc.text(elevation.name, x, currentY - 22);
+  doc.text(elevations.length === 1 ? elevations[0].name : "All elevations", x, currentY - 22);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.text(
@@ -399,11 +606,7 @@ function drawGlassTable(doc: jsPDF, elevation: Elevation, x: number, y: number, 
   currentY += 22;
 
   doc.setFont("helvetica", "normal");
-  elevation.computedGlass.items.forEach((item, index) => {
-    const representativeLite = item.sourceType === "storefront-lite"
-      ? elevation.computedGeometry.lites.find((lite) => lite.id === item.liteId)
-      : undefined;
-
+  rows.forEach((item, index) => {
     if (index % 2 === 0) {
       doc.setFillColor(248, 250, 252);
       doc.rect(x, currentY, width, rowHeight, "F");
@@ -416,14 +619,15 @@ function drawGlassTable(doc: jsPDF, elevation: Elevation, x: number, y: number, 
       formatInches(item.height),
       formatSquareFeet(getGlassItemSquareFeet(item)),
       `${formatWeight(getGlassItemWeightPounds(item))} lb`,
+      formatSquareFeet(getGlassLineSquareFeet(item)),
       item.glassType,
       item.safetyGlazingLikely ? "Likely" : "-"
     ];
     currentX = x + 6;
-    drawGlassPictorial(doc, item.sourceType, representativeLite, currentX - 2, currentY + 4, widths[0] - 12, rowHeight - 8);
+    drawGlassPictorial(doc, item.sourceType, item.representativeLite, currentX - 2, currentY + 4, widths[0] - 12, rowHeight - 8);
     currentX += widths[0];
     values.forEach((value, valueIndex) => {
-      const limit = valueIndex === 7 ? 34 : valueIndex === 6 ? 14 : valueIndex === 5 ? 10 : 18;
+      const limit = valueIndex === 8 ? 32 : valueIndex === 7 ? 12 : valueIndex === 6 ? 14 : valueIndex === 5 ? 10 : 18;
       doc.text(value.slice(0, limit), currentX, currentY + 18);
       currentX += widths[valueIndex + 1];
     });
@@ -435,23 +639,42 @@ function drawGlassTable(doc: jsPDF, elevation: Elevation, x: number, y: number, 
   doc.line(x, currentY, x + width, currentY);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
-  doc.text("TOTALS", x + width - widths[9] - widths[8] - widths[7] - widths[6] + 8, currentY + 15);
-  doc.text(`${formatSquareFeet(totalSquareFeet)} sq ft`, x + width - widths[9] - widths[8] - 8, currentY + 15, { align: "right" });
-  doc.text(`${formatWeight(totalWeight)} lb`, x + width - widths[9] - widths[8] + widths[7] - 8, currentY + 15, { align: "right" });
+  doc.text("TOTALS", x + width - widths[10] - widths[9] - widths[8] - widths[7] + 8, currentY + 15);
+  doc.text(`${formatSquareFeet(totalSquareFeet)} sq ft`, x + width - widths[10] - widths[9] - 8, currentY + 15, { align: "right" });
+  doc.text(`${formatWeight(totalWeight)} lb total`, x + width - widths[10] - widths[9] + widths[8] - 8, currentY + 15, { align: "right" });
 }
 
-function drawQuoteSheet(doc: jsPDF, elevation: Elevation, job: Job, x: number, y: number, width: number) {
-  const quote = calculateQuoteSummary(elevation);
+function applyJobGlassMarks(items: GlassItem[], jobGlassTakeoff?: JobGlassTakeoff): GlassItem[] {
+  if (!jobGlassTakeoff) return items;
+  return items.map((item) => ({
+    ...item,
+    mark: jobGlassTakeoff.markByKey.get(glassKey(item.sourceType, item.width, item.height, item.glassType)) ?? item.mark
+  }));
+}
+
+function glassKey(sourceType: GlassItem["sourceType"], width: number, height: number, glassType: string): string {
+  return [sourceType, normalizeGlassDimension(width), normalizeGlassDimension(height), glassType].join("|");
+}
+
+function normalizeGlassDimension(value: number): string {
+  return String(Math.round(value * 16) / 16);
+}
+
+function drawQuoteSheet(doc: jsPDF, elevations: Elevation[], job: Job, x: number, y: number, width: number) {
+  const quote = elevations.length === 1 ? calculateQuoteSummary(elevations[0]) : calculateJobQuoteSummary(elevations);
   const rows = [
     ["Job", `${job.number || "-"} ${job.name || ""}`.trim()],
     ["Customer", job.customer || "-"],
-    ["Elevation", elevation.name],
-    ["Interior storefront", `${formatSquareFeet(quote.quotedStorefrontSquareFeet)} sq ft @ ${formatCurrency(quote.installedRatePerSquareFoot)} / sq ft`],
-    ["Installed storefront", formatCurrency(quote.installedCost)]
+    ["Elevations", elevations.map((elevation, index) => `E${index + 1} ${elevation.name}`).join(", ")],
+    ["Opening area", `${formatSquareFeet(quote.openingSquareFeet)} sq ft total`],
+    ["Glass", `${formatSquareFeet(quote.glassSquareFeet)} sq ft @ ${formatCurrency(quote.glassRatePerSquareFoot)} / sq ft`],
+    ["Glass total", formatCurrency(quote.glassCost)],
+    ["Aluminum", `${quote.aluminumLinearFeet.toFixed(2)} ln ft @ ${formatCurrency(quote.aluminumRatePerLinearFoot)} / ln ft`],
+    ["Aluminum total", formatCurrency(quote.aluminumCost)]
   ];
 
   if (quote.doorOpeningSquareFeet > 0) {
-    rows.splice(4, 0, ["Door opening excluded", `${formatSquareFeet(quote.doorOpeningSquareFeet)} sq ft`]);
+    rows.splice(4, 0, ["Door opening area", `${formatSquareFeet(quote.doorOpeningSquareFeet)} sq ft noted separately`]);
   }
 
   if (quote.highHeavyGlassSquareFeet > 0) {
@@ -460,6 +683,14 @@ function drawQuoteSheet(doc: jsPDF, elevation: Elevation, job: Job, x: number, y
       `${formatSquareFeet(quote.highHeavyGlassSquareFeet)} sq ft @ +${formatCurrency(quote.highHeavyGlassPremiumRate)} / sq ft`
     ]);
     rows.push(["Premium total", formatCurrency(quote.highHeavyGlassPremiumCost)]);
+  }
+
+  if (quote.lowHeavyGlassSquareFeet > 0) {
+    rows.push([
+      "Heavy glass handling premium",
+      `${formatSquareFeet(quote.lowHeavyGlassSquareFeet)} sq ft under 5'-0" @ +${formatCurrency(quote.lowHeavyGlassPremiumRate)} / sq ft`
+    ]);
+    rows.push(["Heavy handling total", formatCurrency(quote.lowHeavyGlassPremiumCost)]);
   }
 
   if (quote.singleDoorCount > 0) {
@@ -479,7 +710,7 @@ function drawQuoteSheet(doc: jsPDF, elevation: Elevation, job: Job, x: number, y
   doc.text("Customer Quote", x, y);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.text("Budgetary interior field quote based on storefront area, high/heavy glass handling, and standard entrance adders.", x, y + 16);
+  doc.text("Budgetary field quote based on job glass, aluminum length, heavy-glass handling, and standard entrance adders.", x, y + 16);
 
   let currentY = y + 42;
   doc.setDrawColor(17, 24, 39);

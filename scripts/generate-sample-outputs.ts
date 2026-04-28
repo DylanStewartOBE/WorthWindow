@@ -9,7 +9,7 @@ import {
 } from "../src/config/options";
 import { calculateElevation } from "../src/domain/calculate";
 import { noDoorSeedInput, pairDoorSeedInput, seedJob } from "../src/data/seed";
-import { generateDrawingPackagePdf, pdfFileName } from "../src/pdf/pdfGenerator";
+import { generateJobDrawingPackagePdf, pdfFileName } from "../src/pdf/pdfGenerator";
 
 const context = {
   storefrontRulePack: defaultStorefrontRulePack,
@@ -29,22 +29,18 @@ await Promise.all(
 );
 
 const samples = [pairDoorSeedInput, noDoorSeedInput].map((input) => calculateElevation(input, context));
-const manifest = [];
+const packageBlob = generateJobDrawingPackagePdf(samples, seedJob, defaultBranding);
+const packageName = pdfFileName(seedJob, null, "package");
 
-for (const elevation of samples) {
-  const packageBlob = generateDrawingPackagePdf(elevation, seedJob, defaultBranding);
-  const packageName = pdfFileName(seedJob, elevation, "package");
+await writeFile(join(outputDir, packageName), Buffer.from(await packageBlob.arrayBuffer()));
 
-  await writeFile(join(outputDir, packageName), Buffer.from(await packageBlob.arrayBuffer()));
-
-  manifest.push({
-    elevationId: elevation.id,
-    elevationName: elevation.name,
-    files: [packageName],
-    generatedAt: new Date().toISOString()
-  });
-}
+const manifest = [{
+  elevationIds: samples.map((elevation) => elevation.id),
+  elevationNames: samples.map((elevation) => elevation.name),
+  files: [packageName],
+  generatedAt: new Date().toISOString()
+}];
 
 await writeFile(join(outputDir, "manifest.json"), JSON.stringify(manifest, null, 2));
 
-console.log(`Generated ${manifest.length} sample PDF packages in ${outputDir}`);
+console.log(`Generated ${manifest.length} sample PDF package in ${outputDir}`);

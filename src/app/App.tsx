@@ -35,7 +35,7 @@ import { formatFeetInches, formatInches } from "../domain/format";
 import { getDoorGlassCalloutMap } from "../domain/glass";
 import { getDoorColumnIndex } from "../domain/geometry";
 import { createSquaredMeasurementSet } from "../domain/measurements";
-import { createRevisionSnapshot } from "../domain/revision";
+import { createRevisionSnapshot, getNextRevisionNumber } from "../domain/revision";
 import type {
   BrandingConfig,
   DoorConfig,
@@ -117,7 +117,6 @@ export function App() {
   const [jobSetupMode, setJobSetupMode] = useState<JobSetupMode>("new");
   const [savedJobs, setSavedJobs] = useState<Job[]>([]);
   const [savedElevations, setSavedElevations] = useState<Elevation[]>([]);
-  const [revisionCount, setRevisionCount] = useState(0);
   const [, setStatus] = useState("Ready offline");
   const [adminMode, setAdminMode] = useState(() => isAdminModeEnabled());
   const [adminOpen, setAdminOpen] = useState(false);
@@ -239,7 +238,6 @@ export function App() {
     setInput(nextInput);
     setJobSetupMode("new");
     setPdfUrls({});
-    setRevisionCount(0);
     setSavedJobs((current) => uniqueById([...current.map(normalizeJob), jobWithElevation]));
     repository.saveJob(jobWithElevation).catch(() => setStatus("New job is in memory until local storage is available"));
     setStatus("Started new job");
@@ -259,7 +257,6 @@ export function App() {
     }
     setJobSetupMode("existing");
     setPdfUrls({});
-    setRevisionCount(0);
     setStatus(`Loaded ${nextJob.name || "existing job"}`);
   };
 
@@ -269,7 +266,6 @@ export function App() {
     setJob(nextJob);
     setInput(nextInput);
     setPdfUrls({});
-    setRevisionCount(0);
     setSavedJobs((current) => uniqueById([...current.map(normalizeJob), nextJob]));
     repository.saveJob(nextJob).catch(() => setStatus("Elevation is in memory until local storage is available"));
     setStatus("Started new elevation for this job");
@@ -283,7 +279,6 @@ export function App() {
     setInput(toInput(nextElevation));
     saveJobState(nextJob, `Loaded ${nextElevation.name}`);
     setPdfUrls({});
-    setRevisionCount(0);
   };
 
   const archiveCurrentJob = () => {
@@ -465,7 +460,8 @@ export function App() {
   };
 
   const saveRevision = async () => {
-    const nextRevision = String.fromCharCode(65 + revisionCount);
+    const existingRevisions = await repository.getRevisions(input.id).catch(() => []);
+    const nextRevision = getNextRevisionNumber(existingRevisions);
     const calculated = { ...elevation, currentRevisionId: nextRevision };
     const revision = createRevisionSnapshot(calculated, nextRevision);
     const nextJob = normalizeJob({
@@ -481,7 +477,6 @@ export function App() {
     setJob(nextJob);
     setSavedJobs((current) => uniqueById([...current, nextJob]));
     setSavedElevations((current) => uniqueById([...current, calculated]));
-    setRevisionCount((count) => count + 1);
     setStatus(`Saved revision ${nextRevision}`);
   };
 
@@ -531,7 +526,13 @@ export function App() {
   return (
     <main className="app-shell">
       <div className="sticky-controls">
-        <div className="brand-lockup" aria-label={config.branding.companyName}>
+        <a
+          className="brand-lockup"
+          href="https://www.worthcon.com"
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`${config.branding.companyName} website`}
+        >
           <img
             className="brand-logo-full"
             src={config.branding.logoPath ?? "/brand/worthcon.svg"}
@@ -542,7 +543,7 @@ export function App() {
             src={config.branding.logoMarkPath ?? "/brand/worthcon-w.svg"}
             alt={config.branding.companyName}
           />
-        </div>
+        </a>
         <nav className="stepper" ref={stepperRef} aria-label="Wizard steps">
           {steps.map((step, index) => {
             const Icon = step.icon;
@@ -746,7 +747,6 @@ function JobStep({
         <TextField label="Job number" value={job.number} onChange={(value) => updateJob("number", value)} />
         <TextField label="Customer" value={job.customer} onChange={(value) => updateJob("customer", value)} />
         <TextField label="Created by" value={job.createdBy} onChange={(value) => updateJob("createdBy", value)} />
-        <TextField label="Revision" value={job.activeRevision} onChange={(value) => updateJob("activeRevision", value)} />
         <TextField label="Elevation name" value={input.name} onChange={(value) => updateInput({ name: value })} />
       </div>
 
@@ -872,12 +872,13 @@ function LayoutStep({
     <section className="step-content">
       <SectionTitle title="Elevation Layout" subtitle="Rows, columns, and custom bay sizing" />
       <div className="field-grid compact">
-        <NumberField label="Rows" value={input.rows} step={1} onChange={(value) => updateLayoutCount("rows", value)} />
-        <NumberField label="Columns" value={input.columns} step={1} onChange={(value) => updateLayoutCount("columns", value)} />
+        <NumberField label="Rows" value={input.rows} kind="count" min={1} onChange={(value) => updateLayoutCount("rows", value)} />
+        <NumberField label="Columns" value={input.columns} kind="count" min={1} onChange={(value) => updateLayoutCount("columns", value)} />
         <NumberField
           label="Door sets"
           value={getDoorSetCount(input.doorConfig, input.columns)}
-          step={1}
+          kind="count"
+          min={0}
           onChange={updateDoorSetCount}
         />
       </div>
@@ -1580,22 +1581,41 @@ function NumberField({
   label,
   value,
   onChange,
-  step = 0.125
+  kind = "dimension",
+  min = kind === "count" ? 1 : 0
 }: {
   label: string;
   value: number;
   onChange: (value: number) => void;
-  step?: number;
+  kind?: "count" | "dimension";
+  min?: number;
 }) {
+  const [draft, setDraft] = useState(formatNumberInput(value));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setDraft(formatNumberInput(value));
+  }, [focused, value]);
+
   return (
     <label className="field">
       <span>{label}</span>
       <input
-        type="number"
-        inputMode="decimal"
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
+        type="text"
+        inputMode={kind === "count" ? "numeric" : "decimal"}
+        pattern={kind === "count" ? "[0-9]*" : `[0-9'" /.-]*`}
+        value={focused ? draft : formatNumberInput(value)}
+        onFocus={() => setFocused(true)}
+        onBlur={() => {
+          setFocused(false);
+          setDraft(formatNumberInput(value));
+        }}
+        onChange={(event) => {
+          const rawValue = event.target.value;
+          setDraft(rawValue);
+          const parsed = kind === "count" ? parseCountInput(rawValue, min) : parseDimensionInput(rawValue);
+          if (parsed !== null && parsed >= min) onChange(parsed);
+        }}
       />
     </label>
   );
@@ -1622,6 +1642,13 @@ function CustomSizeField({
   onFocus?: () => void;
   onChange: (value: number | null) => void;
 }) {
+  const [draft, setDraft] = useState(value === null ? "" : formatNumberInput(value));
+  const [focused, setFocused] = useState(false);
+
+  useEffect(() => {
+    if (!focused) setDraft(value === null ? "" : formatNumberInput(value));
+  }, [focused, value]);
+
   return (
     <label className="field custom-size-field">
       <span className="field-head">
@@ -1629,20 +1656,30 @@ function CustomSizeField({
         <small className={`field-chip ${status}`}>{status === "manual" ? "Manual" : status === "door" ? "Door" : "Driven"}</small>
       </span>
       <input
-        type="number"
+        type="text"
         inputMode="decimal"
-        step={0.125}
-        value={value ?? ""}
+        pattern={`[0-9'" /.-]*`}
+        value={focused ? draft : value === null ? "" : formatNumberInput(value)}
         placeholder={placeholder}
         disabled={disabled}
-        onFocus={onFocus}
+        onFocus={() => {
+          setFocused(true);
+          onFocus?.();
+        }}
+        onBlur={() => {
+          setFocused(false);
+          const parsed = parseDimensionInput(draft);
+          setDraft(parsed === null ? "" : formatNumberInput(parsed));
+        }}
         onChange={(event) => {
-          if (event.target.value === "") {
+          const rawValue = event.target.value;
+          setDraft(rawValue);
+          if (rawValue.trim() === "") {
             onChange(null);
             return;
           }
-          const nextValue = Number(event.target.value);
-          onChange(Number.isFinite(nextValue) && nextValue > 0 ? nextValue : null);
+          const nextValue = parseDimensionInput(rawValue);
+          if (nextValue !== null && nextValue > 0) onChange(nextValue);
         }}
       />
       <small className="field-note">
@@ -1800,6 +1837,59 @@ function uniqueById<T extends { id: string }>(items: T[]): T[] {
 function isAdminModeEnabled(): boolean {
   const params = new URLSearchParams(window.location.search);
   return params.get("admin") === "1" || window.location.hash === "#admin";
+}
+
+function parseCountInput(value: string, min: number): number | null {
+  const digits = value.replace(/[^\d]/g, "");
+  if (!digits) return null;
+  const parsed = Number(digits);
+  if (!Number.isFinite(parsed)) return null;
+  return Math.max(min, Math.round(parsed));
+}
+
+function parseDimensionInput(value: string): number | null {
+  const normalized = value
+    .trim()
+    .replace(/[”"]/g, "")
+    .replace(/[’]/g, "'")
+    .replace(/\s+/g, " ");
+
+  if (!normalized) return null;
+
+  const architecturalMatch = normalized.match(/^(\d+(?:\.\d+)?)\s*(?:'|ft\b|\-)\s*(.*)$/i);
+  if (architecturalMatch) {
+    const feet = Number(architecturalMatch[1]);
+    const inches = parseInchesPart(architecturalMatch[2].replace(/^-/, "").trim() || "0");
+    if (Number.isFinite(feet) && inches !== null) return roundDimension(feet * 12 + inches);
+  }
+
+  const inches = parseInchesPart(normalized);
+  return inches === null ? null : roundDimension(inches);
+}
+
+function parseInchesPart(value: string): number | null {
+  const normalized = value.trim().replace(/in\b/i, "").trim();
+  if (!normalized) return 0;
+
+  const mixedFraction = normalized.match(/^(\d+(?:\.\d+)?)?\s*(\d+)\/(\d+)$/);
+  if (mixedFraction) {
+    const whole = mixedFraction[1] ? Number(mixedFraction[1]) : 0;
+    const numerator = Number(mixedFraction[2]);
+    const denominator = Number(mixedFraction[3]);
+    if (denominator > 0 && denominator <= 32) return whole + numerator / denominator;
+    return null;
+  }
+
+  const decimal = Number(normalized);
+  return Number.isFinite(decimal) ? decimal : null;
+}
+
+function roundDimension(value: number): number {
+  return Math.round(value * 10_000) / 10_000;
+}
+
+function formatNumberInput(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(4).replace(/0+$/, "").replace(/\.$/, "");
 }
 
 function clampIndex(value: number, count: number): number {

@@ -59,6 +59,8 @@ button {
   display: flex;
   align-items: center;
   min-width: 0;
+  color: inherit;
+  text-decoration: none;
 }
 
 .brand-logo-full {
@@ -496,7 +498,7 @@ h2 {
 .preview-panel {
   position: sticky;
   top: calc(var(--sticky-control-height) + 10px);
-  z-index: 4;
+  z-index: 8;
   display: grid;
   gap: 12px;
   border: 0;
@@ -850,7 +852,12 @@ h2 {
 
   .preview-panel {
     order: -1;
-    top: calc(var(--sticky-control-height) + 8px);
+    top: var(--sticky-control-height);
+    z-index: 12;
+    margin-top: -16px;
+    padding-top: 16px;
+    padding-bottom: 10px;
+    background: #f8fafc;
   }
 }
 

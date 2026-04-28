@@ -1,5 +1,39 @@
 import type { Elevation, Revision } from "./types";
 
+export function getNextRevisionNumber(revisions: Pick<Revision, "number">[]): string {
+  const latestIndex = revisions.reduce((max, revision) => {
+    const index = revisionNumberToIndex(revision.number);
+    return index === null ? max : Math.max(max, index);
+  }, -1);
+
+  return revisionIndexToNumber(latestIndex + 1);
+}
+
+export function revisionIndexToNumber(index: number): string {
+  let value = Math.max(0, Math.floor(index)) + 1;
+  let label = "";
+
+  while (value > 0) {
+    value -= 1;
+    label = String.fromCharCode(65 + (value % 26)) + label;
+    value = Math.floor(value / 26);
+  }
+
+  return label;
+}
+
+export function revisionNumberToIndex(number: string): number | null {
+  const label = number.trim().toUpperCase();
+  if (!/^[A-Z]+$/.test(label)) return null;
+
+  let value = 0;
+  for (const character of label) {
+    value = value * 26 + (character.charCodeAt(0) - 64);
+  }
+
+  return value - 1;
+}
+
 export function createRevisionSnapshot(elevation: Elevation, number: string): Revision {
   const timestamp = new Date().toISOString();
 

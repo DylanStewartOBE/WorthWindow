@@ -196,7 +196,7 @@ export function createBlankJob(createdBy: string): Job {
     createdBy,
     dateCreated: new Date().toISOString().slice(0, 10),
     logoId: "worth-construction-default",
-    activeRevision: "A",
+    activeRevision: "",
     activeElevationId: undefined,
     status: "active",
     elevationIds: [],

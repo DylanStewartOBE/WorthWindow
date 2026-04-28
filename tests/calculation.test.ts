@@ -19,7 +19,7 @@ import {
 import { getDoorColumnIndex } from "../src/domain/geometry";
 import { createSquaredMeasurementSet, getGoverningDimensions } from "../src/domain/measurements";
 import { calculateQuoteSummary } from "../src/domain/quote";
-import { createRevisionSnapshot } from "../src/domain/revision";
+import { createRevisionSnapshot, getNextRevisionNumber } from "../src/domain/revision";
 import type { ElevationInput } from "../src/domain/types";
 import { noDoorSeedInput, pairDoorSeedInput } from "../src/data/seed";
 
@@ -653,5 +653,11 @@ describe("FG-2000 calculation engine", () => {
     expect(revision.number).toBe("A");
     expect(revision.snapshot.computedGeometry.lites[0].glassWidth).not.toBe(999);
     expect(revision.snapshot.input.name).toBe(noDoorSeedInput.name);
+  });
+
+  it("automates revision numbers from existing saved revisions", () => {
+    expect(getNextRevisionNumber([])).toBe("A");
+    expect(getNextRevisionNumber([{ number: "A" }, { number: "B" }])).toBe("C");
+    expect(getNextRevisionNumber([{ number: "Z" }])).toBe("AA");
   });
 });

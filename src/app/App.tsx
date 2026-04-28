@@ -1597,24 +1597,35 @@ function NumberField({
     if (!focused) setDraft(formatNumberInput(value));
   }, [focused, value]);
 
+  const applyDraft = (rawValue: string) => {
+    const nextDraft = kind === "count" ? rawValue.replace(/[^\d]/g, "") : rawValue;
+    setDraft(nextDraft);
+    const parsed = kind === "count" ? parseCountInput(nextDraft, min) : parseDimensionInput(nextDraft);
+    if (parsed !== null && parsed >= min) onChange(parsed);
+  };
+
   return (
     <label className="field">
       <span>{label}</span>
       <input
-        type="text"
+        type={kind === "count" ? "number" : "text"}
         inputMode={kind === "count" ? "numeric" : "decimal"}
         pattern={kind === "count" ? "[0-9]*" : `[0-9'" /.-]*`}
+        min={kind === "count" ? min : undefined}
+        step={kind === "count" ? 1 : undefined}
+        enterKeyHint="done"
+        autoComplete="off"
         value={focused ? draft : formatNumberInput(value)}
         onFocus={() => setFocused(true)}
         onBlur={() => {
           setFocused(false);
           setDraft(formatNumberInput(value));
         }}
+        onKeyDown={(event) => {
+          if (kind === "count" && ["e", "E", ".", "-", "+"].includes(event.key)) event.preventDefault();
+        }}
         onChange={(event) => {
-          const rawValue = event.target.value;
-          setDraft(rawValue);
-          const parsed = kind === "count" ? parseCountInput(rawValue, min) : parseDimensionInput(rawValue);
-          if (parsed !== null && parsed >= min) onChange(parsed);
+          applyDraft(event.target.value);
         }}
       />
     </label>
@@ -1649,6 +1660,17 @@ function CustomSizeField({
     if (!focused) setDraft(value === null ? "" : formatNumberInput(value));
   }, [focused, value]);
 
+  const applyDraft = (rawValue: string) => {
+    setDraft(rawValue);
+    if (rawValue.trim() === "") {
+      onChange(null);
+      return;
+    }
+
+    const nextValue = parseDimensionInput(rawValue);
+    if (nextValue !== null && nextValue > 0) onChange(nextValue);
+  };
+
   return (
     <label className="field custom-size-field">
       <span className="field-head">
@@ -1659,6 +1681,8 @@ function CustomSizeField({
         type="text"
         inputMode="decimal"
         pattern={`[0-9'" /.-]*`}
+        enterKeyHint="done"
+        autoComplete="off"
         value={focused ? draft : value === null ? "" : formatNumberInput(value)}
         placeholder={placeholder}
         disabled={disabled}
@@ -1672,14 +1696,7 @@ function CustomSizeField({
           setDraft(parsed === null ? "" : formatNumberInput(parsed));
         }}
         onChange={(event) => {
-          const rawValue = event.target.value;
-          setDraft(rawValue);
-          if (rawValue.trim() === "") {
-            onChange(null);
-            return;
-          }
-          const nextValue = parseDimensionInput(rawValue);
-          if (nextValue !== null && nextValue > 0) onChange(nextValue);
+          applyDraft(event.target.value);
         }}
       />
       <small className="field-note">

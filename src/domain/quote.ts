@@ -4,6 +4,7 @@ import {
   getGlassLineSquareFeet,
   getTotalGlassSquareFeet
 } from "./glass";
+import { buildMetalTakeoff } from "./metal";
 import type { Elevation } from "./types";
 
 export const GLASS_RATE_PER_SQFT = 12.5;
@@ -59,7 +60,7 @@ export function calculateJobQuoteSummary(elevations: Elevation[]): QuoteSummary 
   );
   const quotedStorefrontSquareFeet = roundToPrecision(Math.max(openingSquareFeet - doorOpeningSquareFeet, 0), 2);
   const glassSquareFeet = getTotalGlassSquareFeet(elevations.flatMap((elevation) => elevation.computedGlass.items));
-  const aluminumLinearFeet = getAluminumLinearFeet(elevations);
+  const aluminumLinearFeet = buildMetalTakeoff(elevations).totalLinearFeet;
   const premiumAreas = getGlassPremiumSquareFeet(elevations);
   const singleDoorCount = elevations.reduce(
     (total, elevation) => total + elevation.computedGeometry.doorOpenings.filter((door) => door.leafCount === 1).length,
@@ -131,21 +132,6 @@ function getGlassPremiumSquareFeet(elevations: Elevation[]): {
     highHeavyGlassSquareFeet: roundToPrecision(totals.highHeavyGlassSquareFeet, 2),
     lowHeavyGlassSquareFeet: roundToPrecision(totals.lowHeavyGlassSquareFeet, 2)
   };
-}
-
-function getAluminumLinearFeet(elevations: Elevation[]): number {
-  return roundToPrecision(
-    elevations.reduce((jobTotal, elevation) => {
-      return (
-        jobTotal +
-        elevation.computedGeometry.members.reduce((elevationTotal, member) => {
-          const lengthInches = Math.max(member.width, member.height);
-          return elevationTotal + lengthInches / 12;
-        }, 0)
-      );
-    }, 0),
-    2
-  );
 }
 
 function roundCurrency(value: number): number {

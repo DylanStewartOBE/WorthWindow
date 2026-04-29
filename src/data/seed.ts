@@ -69,6 +69,8 @@ export const pairDoorSeedInput: ElevationInput = {
     angle: 90,
     condition: "outside"
   },
+  kneeWalls: [],
+  liteSplits: [],
   finishConfig: {
     finishId: "bronze-anodized",
     finishLabel: "Bronze anodized"
@@ -121,6 +123,8 @@ export const noDoorSeedInput: ElevationInput = {
     angle: 90,
     condition: "outside"
   },
+  kneeWalls: [],
+  liteSplits: [],
   finishConfig: {
     finishId: "clear-anodized",
     finishLabel: "Clear anodized"
@@ -192,6 +196,8 @@ export function createBlankElevationInput(jobId: string, createdBy: string): Ele
       angle: 90,
       condition: "outside"
     },
+    kneeWalls: [],
+    liteSplits: [],
     finishConfig: {
       finishId: "clear-anodized",
       finishLabel: "Clear anodized"

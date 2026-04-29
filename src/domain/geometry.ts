@@ -8,10 +8,13 @@ import type {
   BayType,
   ComputedGeometry,
   ComputedGlass,
+  CornerSide,
   DoorOpening,
   DoorSetConfig,
   ElevationInput,
   EntranceRulePack,
+  KneeWall,
+  LiteSplitConfig,
   Lite,
   LiteType,
   MemberSegment,
@@ -20,7 +23,7 @@ import type {
   Transom
 } from "./types";
 
-type VerticalBoundaryType = "edge-left" | "edge-right" | "mullion" | "door-jamb";
+type VerticalBoundaryType = "edge-left" | "edge-right" | "corner-left" | "corner-right" | "mullion" | "door-jamb";
 type HorizontalBoundaryType = "head" | "sill" | "horizontal-mullion" | "door-threshold";
 
 export interface GeometryResult {
@@ -72,6 +75,19 @@ interface DoorSetRuntime extends DoorSetConfig {
   requiredBayWidth: number;
 }
 
+type LiteDraftOptions = {
+  bay: Bay;
+  rowIndex: number;
+  columnIndex: number;
+  type: LiteType;
+  safetyGlazingLikely: boolean;
+  leftBoundaryType: VerticalBoundaryType;
+  rightBoundaryType: VerticalBoundaryType;
+  bottomBoundaryType: HorizontalBoundaryType;
+  topBoundaryType: HorizontalBoundaryType;
+  storefrontRules: StorefrontRulePack;
+};
+
 export function calculateGeometry(
   input: ElevationInput,
   storefrontRules: StorefrontRulePack,
@@ -114,7 +130,7 @@ function calculateNoDoorGeometry(
     governing.openingWidthMeasured - joints.leftJamb - joints.rightJamb
   );
   const frameHeight = roundToPrecision(governing.openingHeightMeasured - joints.head - joints.sill);
-  const verticalBoundaryTypes = buildNoDoorVerticalBoundaryTypes(columns);
+  const verticalBoundaryTypes = buildNoDoorVerticalBoundaryTypes(columns, getActiveCornerSides(input));
   const horizontalBoundaryTypes = buildNoDoorHorizontalBoundaryTypes(rows);
   const columnWidths = resolveLiteAxisSizes(
     input.columnSizingMode,
@@ -134,6 +150,10 @@ function calculateNoDoorGeometry(
     "horizontal",
     storefrontRules
   );
+  const kneeWalls = buildKneeWalls(input, columnWidths, rowHeights[0] ?? 0, storefrontRules);
+  const kneeWallByColumn = new Map(kneeWalls.map((kneeWall) => [kneeWall.columnIndex, kneeWall]));
+  const liteSplitByCell = buildLiteSplitMap(input);
+  const splitMembers: MemberSegment[] = [];
   const xPositions = getCumulativePositions(columnWidths);
   const yPositions = getCumulativePositions(rowHeights);
 
@@ -143,7 +163,7 @@ function calculateNoDoorGeometry(
   for (let rowIndex = 0; rowIndex < rows; rowIndex += 1) {
     for (let columnIndex = 0; columnIndex < columns; columnIndex += 1) {
       const id = `bay-r${rowIndex + 1}-c${columnIndex + 1}`;
-      const bay = {
+      const baseBay = {
         id,
         rowIndex,
         columnIndex,
@@ -154,10 +174,11 @@ function calculateNoDoorGeometry(
         height: rowHeights[rowIndex],
         label: `Lite bay R${rowIndex + 1} C${columnIndex + 1}`
       };
+      const bay = applyKneeWallToBay(baseBay, kneeWallByColumn.get(columnIndex));
 
       bays.push(bay);
       drafts.push(
-        createLiteDraft({
+        ...createLiteDraftsForBay({
           bay,
           rowIndex,
           columnIndex,
@@ -167,14 +188,19 @@ function calculateNoDoorGeometry(
           rightBoundaryType: verticalBoundaryTypes[columnIndex + 1],
           bottomBoundaryType: horizontalBoundaryTypes[rowIndex],
           topBoundaryType: horizontalBoundaryTypes[rowIndex + 1],
-          storefrontRules
+          storefrontRules,
+          split: liteSplitByCell.get(cellKey(rowIndex, columnIndex)),
+          splitMembers
         })
       );
     }
   }
 
   const lites = createLites(drafts, storefrontRules);
-  const members = buildNoDoorMembers(lites, rowHeights, columnWidths, frameWidth, frameHeight, storefrontRules);
+  const members = [
+    ...buildNoDoorMembers(lites, rowHeights, columnWidths, frameWidth, frameHeight, verticalBoundaryTypes, storefrontRules, kneeWalls),
+    ...splitMembers
+  ];
 
   const geometry: ComputedGeometry = {
     frameWidth,
@@ -191,6 +217,7 @@ function calculateNoDoorGeometry(
     bays,
     members,
     lites,
+    kneeWalls,
     transoms: [],
     doorOpenings: [],
     assemblyCallouts: buildAssemblyCallouts({
@@ -245,7 +272,7 @@ function calculateDoorGeometry(
   const maxDoorHeight = Math.max(...doorSetsBase.map((doorSet) => doorSet.height));
   const hasDoorTransom = frameHeight > maxDoorHeight;
 
-  const boundaryTypes = buildDoorBoundaryTypes(columns, doorColumnIndices);
+  const boundaryTypes = buildDoorBoundaryTypes(columns, doorColumnIndices, getActiveCornerSides(input));
   const doorSets = doorSetsBase.map((doorSet) => ({
     ...doorSet,
     requiredBayWidth: getRequiredDoorBayWidth(doorSet, boundaryTypes, storefrontRules)
@@ -277,6 +304,10 @@ function calculateDoorGeometry(
           doorZoneHeight,
           input.doorConfig.rowPlacement
         );
+  const kneeWalls = buildKneeWalls(input, bayWidths, rowHeights[0] ?? 0, storefrontRules);
+  const kneeWallByColumn = new Map(kneeWalls.map((kneeWall) => [kneeWall.columnIndex, kneeWall]));
+  const liteSplitByCell = buildLiteSplitMap(input);
+  const splitMembers: MemberSegment[] = [];
   const yPositions = getCumulativePositions(rowHeights);
   const doorBayHeight =
     hasDoorTransom && rows === 1
@@ -327,7 +358,7 @@ function calculateDoorGeometry(
           };
           bays.push(bay);
           drafts.push(
-            createLiteDraft({
+            ...createLiteDraftsForBay({
               bay,
               rowIndex: spec.rowIndex,
               columnIndex,
@@ -337,7 +368,9 @@ function calculateDoorGeometry(
               rightBoundaryType: boundaryTypes[columnIndex + 1],
               bottomBoundaryType: "horizontal-mullion",
               topBoundaryType: isTopTransom ? "head" : "horizontal-mullion",
-              storefrontRules
+              storefrontRules,
+              split: liteSplitByCell.get(cellKey(spec.rowIndex, columnIndex)),
+              splitMembers
             })
           );
         });
@@ -345,7 +378,7 @@ function calculateDoorGeometry(
     }
 
     buildDoorLiteSpecs(rowHeights, input.doorConfig.rowPlacement, columnIndex, doorColumnIndices).forEach((spec) => {
-      const bay: Bay = {
+      const baseBay: Bay = {
         id: `bay-r${spec.rowIndex + 1}-c${columnIndex + 1}`,
         rowIndex: spec.rowIndex,
         columnIndex,
@@ -356,9 +389,10 @@ function calculateDoorGeometry(
         height: spec.height,
         label: spec.label
       };
+      const bay = applyKneeWallToBay(baseBay, kneeWallByColumn.get(columnIndex));
       bays.push(bay);
       drafts.push(
-        createLiteDraft({
+        ...createLiteDraftsForBay({
           bay,
           rowIndex: spec.rowIndex,
           columnIndex,
@@ -368,24 +402,30 @@ function calculateDoorGeometry(
           rightBoundaryType: boundaryTypes[columnIndex + 1],
           bottomBoundaryType: spec.bottomBoundaryType,
           topBoundaryType: spec.topBoundaryType,
-          storefrontRules
+          storefrontRules,
+          split: liteSplitByCell.get(cellKey(spec.rowIndex, columnIndex)),
+          splitMembers
         })
       );
     });
   }
 
   const lites = createLites(drafts, storefrontRules);
-  const members = buildDoorMembers(
-    bays,
-    lites,
-    columns,
-    frameWidth,
-    frameHeight,
-    boundaryTypes,
-    xPositions,
-    bayWidths,
-    storefrontRules
-  );
+  const members = [
+    ...buildDoorMembers(
+      bays,
+      lites,
+      columns,
+      frameWidth,
+      frameHeight,
+      boundaryTypes,
+      xPositions,
+      bayWidths,
+      storefrontRules,
+      kneeWalls
+    ),
+    ...splitMembers
+  ];
 
   const doorOpenings = doorSets.map((doorSet) => {
     const doorBay = bays.find((bay) => bay.id === `bay-door-${doorSet.index + 1}`);
@@ -457,6 +497,7 @@ function calculateDoorGeometry(
     bays,
     members,
     lites,
+    kneeWalls,
     transoms,
     doorOpenings,
     assemblyCallouts: buildAssemblyCallouts({
@@ -511,18 +552,7 @@ function createLiteDraft({
   bottomBoundaryType,
   topBoundaryType,
   storefrontRules
-}: {
-  bay: Bay;
-  rowIndex: number;
-  columnIndex: number;
-  type: LiteType;
-  safetyGlazingLikely: boolean;
-  leftBoundaryType: VerticalBoundaryType;
-  rightBoundaryType: VerticalBoundaryType;
-  bottomBoundaryType: HorizontalBoundaryType;
-  topBoundaryType: HorizontalBoundaryType;
-  storefrontRules: StorefrontRulePack;
-}): LiteDraft {
+}: LiteDraftOptions): LiteDraft {
   const leftDeduction = getVerticalBoundaryInset(leftBoundaryType, storefrontRules);
   const rightDeduction = getVerticalBoundaryInset(rightBoundaryType, storefrontRules);
   const bottomDeduction = getHorizontalBoundaryInset(bottomBoundaryType, storefrontRules);
@@ -551,6 +581,138 @@ function createLiteDraft({
     glassHeight: roundToSixteenth(dloHeight + bottomGlassBite + topGlassBite),
     safetyGlazingLikely
   };
+}
+
+function createLiteDraftsForBay({
+  split,
+  splitMembers,
+  ...options
+}: LiteDraftOptions & {
+  split?: LiteSplitConfig;
+  splitMembers: MemberSegment[];
+}): LiteDraft[] {
+  if (!split || split.orientation !== "vertical" || split.count < 2) {
+    return [createLiteDraft(options)];
+  }
+
+  const segmentCount = Math.max(2, Math.min(Math.round(split.count), 4));
+  const leftDeduction = getVerticalBoundaryInset(options.leftBoundaryType, options.storefrontRules);
+  const rightDeduction = getVerticalBoundaryInset(options.rightBoundaryType, options.storefrontRules);
+  const splitMemberWidth = options.storefrontRules.sightlines.verticalMullion;
+  const clearSpan = Math.max(
+    options.bay.width - leftDeduction - rightDeduction - splitMemberWidth * (segmentCount - 1),
+    0
+  );
+  const segmentDloWidth = clearSpan / segmentCount;
+  const drafts: LiteDraft[] = [];
+  let segmentX = options.bay.x;
+
+  for (let index = 0; index < segmentCount; index += 1) {
+    const isFirst = index === 0;
+    const isLast = index === segmentCount - 1;
+    const segmentLeftDeduction = isFirst ? leftDeduction : splitMemberWidth / 2;
+    const segmentRightDeduction = isLast ? rightDeduction : splitMemberWidth / 2;
+    const width = isLast
+      ? roundToPrecision(options.bay.x + options.bay.width - segmentX)
+      : roundToPrecision(segmentLeftDeduction + segmentDloWidth + segmentRightDeduction);
+    drafts.push(
+      createLiteDraft({
+        ...options,
+        bay: {
+          ...options.bay,
+          id: `${options.bay.id}-split-${index + 1}`,
+          x: roundToPrecision(segmentX),
+          width,
+          label: `${options.bay.label} split ${index + 1}`
+        },
+        leftBoundaryType: isFirst ? options.leftBoundaryType : "mullion",
+        rightBoundaryType: isLast ? options.rightBoundaryType : "mullion"
+      })
+    );
+    segmentX = roundToPrecision(segmentX + width);
+  }
+
+  const bottomInset = getHorizontalBoundaryInset(options.bottomBoundaryType, options.storefrontRules);
+  const topInset = getHorizontalBoundaryInset(options.topBoundaryType, options.storefrontRules);
+  let memberCenterX = roundToPrecision(options.bay.x + leftDeduction + segmentDloWidth + splitMemberWidth / 2);
+  for (let index = 1; index < segmentCount; index += 1) {
+    splitMembers.push({
+      id: `member-lite-split-v-r${options.rowIndex + 1}-c${options.columnIndex + 1}-${index}`,
+      role: "vertical-mullion",
+      x: roundToPrecision(memberCenterX - splitMemberWidth / 2),
+      y: roundToPrecision(options.bay.y + bottomInset),
+      width: splitMemberWidth,
+      height: roundToPrecision(Math.max(options.bay.height - bottomInset - topInset, 0))
+    });
+    memberCenterX = roundToPrecision(memberCenterX + segmentDloWidth + splitMemberWidth);
+  }
+
+  return drafts;
+}
+
+function applyKneeWallToBay(bay: Bay, kneeWall?: KneeWall): Bay {
+  if (!kneeWall || bay.rowIndex !== 0 || kneeWall.height <= 0) return bay;
+
+  return {
+    ...bay,
+    y: roundToPrecision(bay.y + kneeWall.height),
+    height: roundToPrecision(Math.max(bay.height - kneeWall.height, 0)),
+    label: `${bay.label} above knee wall`
+  };
+}
+
+function buildKneeWalls(
+  input: ElevationInput,
+  columnWidths: number[],
+  bottomRowHeight: number,
+  storefrontRules: StorefrontRulePack
+): KneeWall[] {
+  const xPositions = getCumulativePositions(columnWidths);
+  const uniqueWalls = new Map<number, number>();
+
+  (input.kneeWalls ?? []).forEach((wall) => {
+    const columnIndex = clampColumnIndex(wall.columnIndex, columnWidths.length);
+    const height = clampKneeWallHeight(wall.height, bottomRowHeight, storefrontRules);
+    if (height <= 0) return;
+    uniqueWalls.set(columnIndex, height);
+  });
+
+  return Array.from(uniqueWalls.entries())
+    .sort(([left], [right]) => left - right)
+    .map(([columnIndex, height]) => ({
+      id: `knee-wall-c${columnIndex + 1}`,
+      columnIndex,
+      x: xPositions[columnIndex] ?? 0,
+      y: 0,
+      width: roundToPrecision(columnWidths[columnIndex] ?? 0),
+      height
+    }));
+}
+
+function clampKneeWallHeight(height: number, bottomRowHeight: number, storefrontRules: StorefrontRulePack): number {
+  const minimumLiteAboveWall = storefrontRules.sightlines.sill + storefrontRules.sightlines.horizontalMullion;
+  const maxHeight = Math.max(bottomRowHeight - minimumLiteAboveWall, 0);
+  return roundToPrecision(Math.min(Math.max(Number.isFinite(height) ? height : 0, 0), maxHeight));
+}
+
+function buildLiteSplitMap(input: ElevationInput): Map<string, LiteSplitConfig> {
+  const map = new Map<string, LiteSplitConfig>();
+  (input.liteSplits ?? []).forEach((split) => {
+    const rowIndex = Math.max(0, Math.min(Math.max(input.rows - 1, 0), Math.round(split.rowIndex)));
+    const columnIndex = clampColumnIndex(split.columnIndex, input.columns);
+    const count = Math.max(2, Math.min(Math.round(split.count || 2), 4));
+    map.set(cellKey(rowIndex, columnIndex), {
+      rowIndex,
+      columnIndex,
+      orientation: split.orientation === "horizontal" ? "horizontal" : "vertical",
+      count
+    });
+  });
+  return map;
+}
+
+function cellKey(rowIndex: number, columnIndex: number): string {
+  return `${rowIndex}:${columnIndex}`;
 }
 
 function createLites(drafts: LiteDraft[], storefrontRules: StorefrontRulePack): Lite[] {
@@ -661,24 +823,30 @@ function buildNoDoorMembers(
   columnWidths: number[],
   frameWidth: number,
   frameHeight: number,
-  storefrontRules: StorefrontRulePack
+  verticalBoundaryTypes: VerticalBoundaryType[],
+  storefrontRules: StorefrontRulePack,
+  kneeWalls: KneeWall[] = []
 ): MemberSegment[] {
+  const leftMemberWidth = getVerticalBoundaryMemberWidth(verticalBoundaryTypes[0], storefrontRules);
+  const rightMemberWidth = getVerticalBoundaryMemberWidth(verticalBoundaryTypes[verticalBoundaryTypes.length - 1], storefrontRules);
+  const leftMemberBase = getEdgeKneeWallHeight(kneeWalls, 0);
+  const rightMemberBase = getEdgeKneeWallHeight(kneeWalls, columnWidths.length - 1);
   const members: MemberSegment[] = [
     {
       id: "member-left-jamb",
-      role: "left-jamb",
+      role: getBoundaryMemberRole(verticalBoundaryTypes[0], "left-jamb"),
       x: 0,
-      y: 0,
-      width: storefrontRules.sightlines.leftJamb,
-      height: frameHeight
+      y: leftMemberBase,
+      width: leftMemberWidth,
+      height: roundToPrecision(Math.max(frameHeight - leftMemberBase, 0))
     },
     {
       id: "member-right-jamb",
-      role: "right-jamb",
-      x: roundToPrecision(frameWidth - storefrontRules.sightlines.rightJamb),
-      y: 0,
-      width: storefrontRules.sightlines.rightJamb,
-      height: frameHeight
+      role: getBoundaryMemberRole(verticalBoundaryTypes[verticalBoundaryTypes.length - 1], "right-jamb"),
+      x: roundToPrecision(frameWidth - rightMemberWidth),
+      y: rightMemberBase,
+      width: rightMemberWidth,
+      height: roundToPrecision(Math.max(frameHeight - rightMemberBase, 0))
     }
   ];
 
@@ -702,7 +870,7 @@ function buildNoDoorMembers(
       id: `member-sill-${lite.id}`,
       role: "sill",
       x: lite.dloX,
-      y: 0,
+      y: roundToPrecision(Math.max(lite.dloY - storefrontRules.sightlines.sill, 0)),
       width: lite.dloWidth,
       height: storefrontRules.sightlines.sill
     });
@@ -748,24 +916,29 @@ function buildDoorMembers(
   boundaryTypes: VerticalBoundaryType[],
   xPositions: number[],
   bayWidths: number[],
-  storefrontRules: StorefrontRulePack
+  storefrontRules: StorefrontRulePack,
+  kneeWalls: KneeWall[] = []
 ): MemberSegment[] {
+  const leftMemberWidth = getVerticalBoundaryMemberWidth(boundaryTypes[0], storefrontRules);
+  const rightMemberWidth = getVerticalBoundaryMemberWidth(boundaryTypes[boundaryTypes.length - 1], storefrontRules);
+  const leftMemberBase = getEdgeKneeWallHeight(kneeWalls, 0);
+  const rightMemberBase = getEdgeKneeWallHeight(kneeWalls, bayWidths.length - 1);
   const members: MemberSegment[] = [
     {
       id: "member-left-jamb",
-      role: "left-jamb",
+      role: getBoundaryMemberRole(boundaryTypes[0], "left-jamb"),
       x: 0,
-      y: 0,
-      width: storefrontRules.sightlines.leftJamb,
-      height: frameHeight
+      y: leftMemberBase,
+      width: leftMemberWidth,
+      height: roundToPrecision(Math.max(frameHeight - leftMemberBase, 0))
     },
     {
       id: "member-right-jamb",
-      role: "right-jamb",
-      x: roundToPrecision(frameWidth - storefrontRules.sightlines.rightJamb),
-      y: 0,
-      width: storefrontRules.sightlines.rightJamb,
-      height: frameHeight
+      role: getBoundaryMemberRole(boundaryTypes[boundaryTypes.length - 1], "right-jamb"),
+      x: roundToPrecision(frameWidth - rightMemberWidth),
+      y: rightMemberBase,
+      width: rightMemberWidth,
+      height: roundToPrecision(Math.max(frameHeight - rightMemberBase, 0))
     }
   ];
 
@@ -791,7 +964,7 @@ function buildDoorMembers(
       id: `member-sill-${lite.id}`,
       role: "sill",
       x: lite.dloX,
-      y: 0,
+      y: roundToPrecision(Math.max(lite.dloY - storefrontRules.sightlines.sill, 0)),
       width: lite.dloWidth,
       height: storefrontRules.sightlines.sill
     });
@@ -849,6 +1022,10 @@ function buildDoorMembers(
   });
 
   return members;
+}
+
+function getEdgeKneeWallHeight(kneeWalls: KneeWall[], columnIndex: number): number {
+  return roundToPrecision(kneeWalls.find((kneeWall) => kneeWall.columnIndex === columnIndex)?.height ?? 0);
 }
 
 function resolveDoorRowHeights(
@@ -979,8 +1156,21 @@ function getBayClearSpan(
 function getVerticalBoundaryInset(type: VerticalBoundaryType, storefrontRules: StorefrontRulePack): number {
   if (type === "edge-left") return storefrontRules.sightlines.leftJamb;
   if (type === "edge-right") return storefrontRules.sightlines.rightJamb;
+  if (type === "corner-left" || type === "corner-right") return getCornerMullionSightline(storefrontRules);
   if (type === "door-jamb") return storefrontRules.sightlines.doorJamb / 2;
   return storefrontRules.sightlines.verticalMullion / 2;
+}
+
+function getVerticalBoundaryMemberWidth(type: VerticalBoundaryType, storefrontRules: StorefrontRulePack): number {
+  if (type === "edge-left") return storefrontRules.sightlines.leftJamb;
+  if (type === "edge-right") return storefrontRules.sightlines.rightJamb;
+  if (type === "corner-left" || type === "corner-right") return getCornerMullionSightline(storefrontRules);
+  if (type === "door-jamb") return storefrontRules.sightlines.doorJamb;
+  return storefrontRules.sightlines.verticalMullion;
+}
+
+function getBoundaryMemberRole(type: VerticalBoundaryType, fallback: "left-jamb" | "right-jamb"): MemberSegment["role"] {
+  return type === "corner-left" || type === "corner-right" ? "corner" : fallback;
 }
 
 function getHorizontalBoundaryInset(type: HorizontalBoundaryType, storefrontRules: StorefrontRulePack): number {
@@ -995,6 +1185,8 @@ function getVerticalGlassBite(type: VerticalBoundaryType, storefrontRules: Store
   if (!storefrontRules.glassBite) return fallback;
   if (type === "edge-left") return storefrontRules.glassBite.leftJamb;
   if (type === "edge-right") return storefrontRules.glassBite.rightJamb;
+  if (type === "corner-left") return storefrontRules.glassBite.leftJamb;
+  if (type === "corner-right") return storefrontRules.glassBite.rightJamb;
   if (type === "door-jamb") return storefrontRules.glassBite.doorJamb;
   return storefrontRules.glassBite.verticalMullion;
 }
@@ -1008,11 +1200,15 @@ function getHorizontalGlassBite(type: HorizontalBoundaryType, storefrontRules: S
   return storefrontRules.glassBite.horizontalMullion;
 }
 
-function buildDoorBoundaryTypes(columns: number, doorColumnIndex: number | number[]): VerticalBoundaryType[] {
+function buildDoorBoundaryTypes(
+  columns: number,
+  doorColumnIndex: number | number[],
+  cornerSides = new Set<CornerSide>()
+): VerticalBoundaryType[] {
   const doorColumnIndices = Array.isArray(doorColumnIndex) ? doorColumnIndex : [doorColumnIndex];
   const boundaryTypes: VerticalBoundaryType[] = Array.from({ length: columns + 1 }, (_, index) => {
-    if (index === 0) return "edge-left";
-    if (index === columns) return "edge-right";
+    if (index === 0) return cornerSides.has("left") ? "corner-left" : "edge-left";
+    if (index === columns) return cornerSides.has("right") ? "corner-right" : "edge-right";
     if (doorColumnIndices.some((columnIndex) => index === columnIndex || index === columnIndex + 1)) return "door-jamb";
     return "mullion";
   });
@@ -1145,10 +1341,10 @@ export function getDoorPackageWidth(input: ElevationInput): number {
   return input.doorConfig.widthPerLeaf * (input.doorConfig.doorType === "pair" ? 2 : 1);
 }
 
-function buildNoDoorVerticalBoundaryTypes(columns: number): VerticalBoundaryType[] {
+function buildNoDoorVerticalBoundaryTypes(columns: number, cornerSides = new Set<CornerSide>()): VerticalBoundaryType[] {
   return Array.from({ length: columns + 1 }, (_, index) => {
-    if (index === 0) return "edge-left";
-    if (index === columns) return "edge-right";
+    if (index === 0) return cornerSides.has("left") ? "corner-left" : "edge-left";
+    if (index === columns) return cornerSides.has("right") ? "corner-right" : "edge-right";
     return "mullion";
   });
 }
@@ -1709,7 +1905,7 @@ function buildNotes(
     noteLibrary.finish[input.finishConfig.finishId],
     noteLibrary.glass[input.glassConfig.glassTypeId],
     input.cornerConfig.hasCorner
-      ? `Corner condition: ${input.cornerConfig.angle} degree ${input.cornerConfig.condition ?? "outside"} ${input.cornerConfig.side} return with corner mullion sightline assumed at ${getCornerMullionSightline(storefrontRules)} in.`
+      ? `Corner condition: ${input.cornerConfig.condition ?? "outside"} ${input.cornerConfig.side} return with corner mullion sightline assumed at ${getCornerMullionSightline(storefrontRules)} in.`
       : undefined,
     input.doorConfig.swing ? noteLibrary.hardware[input.doorConfig.swing] : undefined,
     input.doorConfig.hingeType ? noteLibrary.hardware[input.doorConfig.hingeType] : undefined,
@@ -1722,4 +1918,10 @@ function buildNotes(
 
 function getCornerMullionSightline(storefrontRules: StorefrontRulePack): number {
   return storefrontRules.sightlines.cornerMullion ?? storefrontRules.nominalFaceWidth * 2;
+}
+
+function getActiveCornerSides(input: ElevationInput): Set<CornerSide> {
+  const sides = new Set<CornerSide>(input.cornerSides ?? []);
+  if (input.cornerConfig.hasCorner) sides.add(input.cornerConfig.side);
+  return sides;
 }

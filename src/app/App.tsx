@@ -15,7 +15,8 @@ import {
   Save,
   Settings,
   Share2,
-  SlidersHorizontal
+  SlidersHorizontal,
+  Trash2
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
@@ -48,7 +49,10 @@ import type {
   ElevationInput,
   EntranceRulePack,
   Job,
+  KneeWallConfig,
   LayoutSizingMode,
+  Lite,
+  LiteSplitConfig,
   NoteLibrary,
   StorefrontRulePack,
   ValidationLibrary
@@ -94,12 +98,13 @@ type CustomSizingFieldState = {
   value: number | null;
 };
 
-type AssemblySelectionType = "column" | "door";
+type SelectionTargetType = "column" | "door" | "lite" | "knee-wall";
 type PreviewMode = "elevation" | "plan";
 
 type AssemblyRegion = {
   mark: string;
-  type: AssemblySelectionType;
+  type: SelectionTargetType;
+  elementId?: string;
   x: number;
   y: number;
   width: number;
@@ -170,7 +175,8 @@ export function App() {
     }),
     [config]
   );
-  const elevation = useMemo(() => calculateElevation(input, calculationContext), [input, calculationContext]);
+  const effectiveInput = useMemo(() => withEffectiveCornerSides(input, savedElevations), [input, savedElevations]);
+  const elevation = useMemo(() => calculateElevation(effectiveInput, calculationContext), [effectiveInput, calculationContext]);
   const jobElevations = useMemo(() => {
     const currentElevation = input.jobId === job.id ? elevation : null;
     const matchingElevations = savedElevations.filter((item) => item.jobId === job.id);
@@ -244,12 +250,12 @@ export function App() {
       setSelectedAssemblyMark(`DA${clampIndex(activeDoorSetIndex, Math.max(getDoorSetCount(input.doorConfig, input.columns), 1)) + 1}`);
       return;
     }
-    if (activeStep === 2 && (!selectedAssemblyMark || !selectedAssemblyMark.startsWith("A"))) {
+    if (activeStep === 2 && !selectedAssemblyMark) {
       setSelectedAssemblyMark("A1");
     }
   }, [activeStep, activeDoorSetIndex, input.doorConfig, input.columns, selectedAssemblyMark]);
 
-  const selectAssembly = (mark: string, type: AssemblySelectionType) => {
+  const selectAssembly = (mark: string, type: SelectionTargetType) => {
     setSelectedAssemblyMark(mark);
     if (type === "door") {
       const doorIndex = clampIndex(
@@ -258,6 +264,10 @@ export function App() {
       );
       setActiveDoorSetIndex(doorIndex);
       setActiveStep(3);
+      return;
+    }
+    if (type === "lite" || type === "knee-wall") {
+      setActiveStep(2);
       return;
     }
     setActiveStep(2);
@@ -319,6 +329,61 @@ export function App() {
     setSavedJobs((current) => uniqueById([...current.map(normalizeJob), nextJob]));
     repository.saveJob(nextJob).catch(() => setStatus("Elevation is in memory until local storage is available"));
     setStatus("Started new elevation for this job");
+  };
+
+  const deleteJobElevation = async (elevationId: string) => {
+    const currentJobElevationIds = job.elevationIds.filter((id) => jobElevations.some((item) => item.id === id));
+    if (currentJobElevationIds.length <= 1) {
+      setStatus("A job needs at least one elevation.");
+      return;
+    }
+
+    const targetElevation = jobElevations.find((item) => item.id === elevationId);
+    const targetName = targetElevation?.name || "this elevation";
+    const confirmed = window.confirm(
+      `Delete ${targetName}? This removes the local elevation from this job and cannot be undone from the app.`
+    );
+    if (!confirmed) return;
+
+    const nextElevationIds = job.elevationIds.filter((id) => id !== elevationId);
+    const fallbackElevationId = nextElevationIds.find((id) => id !== elevationId) ?? input.id;
+    const nextActiveElevationId = elevationId === input.id ? fallbackElevationId : input.id;
+    const nextJob = normalizeJob({
+      ...job,
+      activeElevationId: nextActiveElevationId,
+      elevationIds: nextElevationIds
+    });
+    const nextSavedElevations = savedElevations
+      .filter((item) => item.id !== elevationId)
+      .map((item) => {
+        const corner = normalizeCornerConfig(item.cornerConfig);
+        if (corner.linkedElevationId !== elevationId) return item;
+        return {
+          ...item,
+          cornerConfig: { ...corner, hasCorner: false, linkedElevationId: undefined },
+          cornerSides: undefined
+        };
+      });
+    const nextInputSource =
+      elevationId === input.id
+        ? nextSavedElevations.find((item) => item.id === nextActiveElevationId) ?? jobElevations.find((item) => item.id === nextActiveElevationId)
+        : null;
+
+    setJob(nextJob);
+    setSavedJobs((current) => uniqueById([...current.map(normalizeJob), nextJob]));
+    setSavedElevations(nextSavedElevations);
+    if (nextInputSource) setInput(toInput(nextInputSource));
+    setPdfUrls({});
+    setPreviewMode("elevation");
+
+    try {
+      await repository.deleteElevation(elevationId);
+      await repository.saveJob(nextJob);
+      await Promise.all(nextSavedElevations.map((item) => repository.saveElevation(item)));
+      setStatus(`Deleted ${targetName}`);
+    } catch {
+      setStatus("Deleted locally in memory; storage will catch up when available.");
+    }
   };
 
   const loadJobElevation = (elevationId: string) => {
@@ -415,7 +480,7 @@ export function App() {
         linkedElevationId
       }
     });
-    const calculatedCurrent = calculateElevation(nextInput, calculationContext);
+    const calculatedCurrent = calculateElevation(withEffectiveCornerSides(nextInput, savedElevations), calculationContext);
     const existingReturn = savedElevations.find((item) => item.id === linkedElevationId);
     const baseReturnInput = existingReturn
       ? toInput(existingReturn)
@@ -443,7 +508,8 @@ export function App() {
             side: nextInput.cornerConfig.side,
             angle: baseReturnInput.cornerConfig.angle,
             condition: baseReturnInput.cornerConfig.condition
-          }
+          },
+          cornerSides: [oppositeCornerSide(nextInput.cornerConfig.side)]
         }
       )
     );
@@ -568,6 +634,47 @@ export function App() {
         columnWidths: axis === "column" ? nextSizes : current.columnWidths
       };
       return normalizeLayoutSizingInput(nextInput, axis, index);
+    });
+  };
+
+  const updateKneeWall = (columnIndex: number, height: number | null) => {
+    setInput((current) => {
+      const normalizedWalls = normalizeKneeWallConfigs(current.kneeWalls, current.columns);
+      const nextWalls =
+        height === null
+          ? normalizedWalls.filter((wall) => wall.columnIndex !== columnIndex)
+          : uniqueKneeWalls([
+              ...normalizedWalls.filter((wall) => wall.columnIndex !== columnIndex),
+              { columnIndex, height }
+            ]);
+
+      return normalizeLayoutSizingInput({
+        ...current,
+        kneeWalls: nextWalls
+      });
+    });
+  };
+
+  const updateLiteSplit = (lite: Lite, count: number | null) => {
+    setInput((current) => {
+      const normalizedSplits = normalizeLiteSplitConfigs(current.liteSplits, current.rows, current.columns);
+      const nextSplits =
+        count === null
+          ? normalizedSplits.filter((split) => split.rowIndex !== lite.rowIndex || split.columnIndex !== lite.columnIndex)
+          : uniqueLiteSplits([
+              ...normalizedSplits.filter((split) => split.rowIndex !== lite.rowIndex || split.columnIndex !== lite.columnIndex),
+              {
+                rowIndex: lite.rowIndex,
+                columnIndex: lite.columnIndex,
+                orientation: "vertical",
+                count
+              }
+            ]);
+
+      return normalizeLayoutSizingInput({
+        ...current,
+        liteSplits: nextSplits
+      });
     });
   };
 
@@ -727,6 +834,7 @@ export function App() {
               onLoadJob={loadExistingJob}
               onCreateElevation={createElevationForJob}
               onLoadElevation={loadJobElevation}
+              onDeleteElevation={deleteJobElevation}
               onArchiveJob={archiveCurrentJob}
               onRestoreJob={restoreJob}
             />
@@ -743,10 +851,13 @@ export function App() {
               updateDoorSetCount={updateDoorSetCount}
               updateSizingMode={updateSizingMode}
               updateCustomSize={updateCustomSize}
+              updateKneeWall={updateKneeWall}
+              updateLiteSplit={updateLiteSplit}
               updateDoor={updateDoor}
               updateCorner={updateCorner}
               onShowFloorPlan={() => setPreviewMode("plan")}
               onSelectColumnAssembly={(columnIndex) => setSelectedAssemblyMark(`A${columnIndex + 1}`)}
+              selectedAssemblyMark={selectedAssemblyMark}
             />
           )}
           {activeStep === 3 && (
@@ -837,6 +948,7 @@ function JobStep({
   onLoadJob,
   onCreateElevation,
   onLoadElevation,
+  onDeleteElevation,
   onArchiveJob,
   onRestoreJob
 }: {
@@ -854,6 +966,7 @@ function JobStep({
   onLoadJob: (jobId: string) => void;
   onCreateElevation: () => void;
   onLoadElevation: (elevationId: string) => void;
+  onDeleteElevation: (elevationId: string) => void;
   onArchiveJob: () => void;
   onRestoreJob: (jobId: string) => void;
 }) {
@@ -910,18 +1023,27 @@ function JobStep({
           <span>No elevations saved for this job yet.</span>
         ) : (
           jobElevations.map((item, index) => (
-            <button
+            <div
               key={item.id}
-              type="button"
               className={`elevation-row ${item.id === activeElevationId ? "selected" : ""}`}
-              onClick={() => onLoadElevation(item.id)}
             >
-              <span>
-                <strong>{index + 1}. {item.name}</strong>
-                <small>{formatFeetInches(item.governingWidth)} x {formatFeetInches(item.governingHeight)}</small>
-              </span>
-              <small>{item.currentRevisionId ? `Rev ${item.currentRevisionId}` : "Working"}</small>
-            </button>
+              <button type="button" className="elevation-row-main" onClick={() => onLoadElevation(item.id)}>
+                <span>
+                  <strong>{index + 1}. {item.name}</strong>
+                  <small>{formatFeetInches(item.governingWidth)} x {formatFeetInches(item.governingHeight)}</small>
+                </span>
+                <small>{item.currentRevisionId ? `Rev ${item.currentRevisionId}` : "Working"}</small>
+              </button>
+              <button
+                type="button"
+                className="icon-button danger"
+                aria-label={`Delete ${item.name}`}
+                disabled={jobElevations.length <= 1}
+                onClick={() => onDeleteElevation(item.id)}
+              >
+                <Trash2 size={17} />
+              </button>
+            </div>
           ))
         )}
       </div>
@@ -1001,10 +1123,13 @@ function LayoutStep({
   updateDoorSetCount,
   updateSizingMode,
   updateCustomSize,
+  updateKneeWall,
+  updateLiteSplit,
   updateDoor,
   updateCorner,
   onShowFloorPlan,
-  onSelectColumnAssembly
+  onSelectColumnAssembly,
+  selectedAssemblyMark
 }: {
   input: ElevationInput;
   elevation: Elevation;
@@ -1013,10 +1138,13 @@ function LayoutStep({
   updateDoorSetCount: (value: number) => void;
   updateSizingMode: (axis: LayoutAxis, mode: LayoutSizingMode) => void;
   updateCustomSize: (axis: LayoutAxis, index: number, value: number | null) => void;
+  updateKneeWall: (columnIndex: number, height: number | null) => void;
+  updateLiteSplit: (lite: Lite, count: number | null) => void;
   updateDoor: (patch: Partial<DoorConfig>) => void;
   updateCorner: (patch: Partial<CornerConfig>) => void;
   onShowFloorPlan: () => void;
   onSelectColumnAssembly: (columnIndex: number) => void;
+  selectedAssemblyMark: string | null;
 }) {
   const doorColumnIndex =
     input.doorConfig.columnIndex ?? getDoorColumnIndex(input.columns, input.doorConfig.locationMode);
@@ -1026,12 +1154,12 @@ function LayoutStep({
   const rowManualLimit = getCustomManualLimit("row", input, doorColumnIndex);
   const continuationSide = getContinuationCornerSide(input.id, jobElevations);
   const cornerSide = continuationSide ?? input.cornerConfig.side;
-  const cornerSideOptions = continuationSide
-    ? [{ value: continuationSide, label: titleCase(continuationSide) }]
-    : [
-        { value: "left", label: "Left" },
-        { value: "right", label: "Right" }
-      ];
+  const selectedColumnIndex =
+    getSelectedColumnIndex(selectedAssemblyMark, input.columns) ??
+    getSelectedKneeWallColumnIndex(selectedAssemblyMark, elevation);
+  const selectedLite = getSelectedLite(selectedAssemblyMark, elevation);
+  const kneeWallState = getKneeWallControlState(input, elevation, selectedColumnIndex);
+  const liteSplitState = getLiteSplitControlState(input, selectedLite);
 
   return (
     <section className="step-content">
@@ -1050,30 +1178,6 @@ function LayoutStep({
       {input.doorConfig.hasDoor && (
         <p className="layout-note">One door set can occupy each left-to-right bay. Door package details live on the Door tab.</p>
       )}
-      <Segmented
-        label="Corner side"
-        value={cornerSide}
-        options={cornerSideOptions}
-        onChange={(value) => updateCorner({ side: value as CornerSide })}
-      />
-      <Segmented
-        label="Corner type"
-        value={input.cornerConfig.condition}
-        options={[
-          { value: "outside", label: "Outside" },
-          { value: "inside", label: "Inside" }
-        ]}
-        onChange={(value) => updateCorner({ condition: value as CornerCondition })}
-      />
-      <div className="field-grid compact">
-        <NumberField
-          label="Corner angle"
-          value={input.cornerConfig.angle}
-          kind="count"
-          min={1}
-          onChange={(value) => updateCorner({ angle: value })}
-        />
-      </div>
       <button
         type="button"
         className="secondary-button wide"
@@ -1084,6 +1188,96 @@ function LayoutStep({
       >
         {input.cornerConfig.hasCorner ? "Open floor plan selector" : "Add next elevation at corner"}
       </button>
+      {kneeWallState && (
+        <div className="knee-wall-panel">
+          <div>
+            <strong>{kneeWallState.title}</strong>
+            <span>{kneeWallState.description}</span>
+          </div>
+          {kneeWallState.existingWall ? (
+            <>
+              <NumberField
+                label="Knee-wall height"
+                value={kneeWallState.existingWall.height}
+                onChange={(value) => updateKneeWall(kneeWallState.columnIndex, value)}
+              />
+              <button
+                type="button"
+                className="secondary-button wide"
+                onClick={() => updateKneeWall(kneeWallState.columnIndex, null)}
+              >
+                Remove knee-wall
+              </button>
+            </>
+          ) : kneeWallState.canAdd ? (
+            <button
+              type="button"
+              className="secondary-button wide"
+              onClick={() => updateKneeWall(kneeWallState.columnIndex, kneeWallState.defaultHeight)}
+            >
+              Add knee-wall to {kneeWallState.assemblyMark}
+            </button>
+          ) : (
+            <p className="layout-note">{kneeWallState.reason}</p>
+          )}
+        </div>
+      )}
+      {liteSplitState && selectedLite && (
+        <div className="knee-wall-panel">
+          <div>
+            <strong>{liteSplitState.title}</strong>
+            <span>{liteSplitState.description}</span>
+          </div>
+          {liteSplitState.existingSplit ? (
+            <>
+              <NumberField
+                label="Vertical lites"
+                value={liteSplitState.existingSplit.count}
+                kind="count"
+                min={2}
+                onChange={(value) => updateLiteSplit(selectedLite, Math.max(2, Math.min(value, 4)))}
+              />
+              <button
+                type="button"
+                className="secondary-button wide"
+                onClick={() => updateLiteSplit(selectedLite, null)}
+              >
+                Remove lite split
+              </button>
+            </>
+          ) : (
+            <button
+              type="button"
+              className="secondary-button wide"
+              onClick={() => updateLiteSplit(selectedLite, 2)}
+            >
+              Split {selectedLite.mark} vertically
+            </button>
+          )}
+        </div>
+      )}
+      {input.cornerConfig.hasCorner && !continuationSide && (
+        <Segmented
+          label="Corner side"
+          value={cornerSide}
+          options={[
+            { value: "left", label: "Left" },
+            { value: "right", label: "Right" }
+          ]}
+          onChange={(value) => updateCorner({ side: value as CornerSide })}
+        />
+      )}
+      {input.cornerConfig.hasCorner && (
+        <Segmented
+          label="Corner type"
+          value={input.cornerConfig.condition}
+          options={[
+            { value: "outside", label: "Outside" },
+            { value: "inside", label: "Inside" }
+          ]}
+          onChange={(value) => updateCorner({ condition: value as CornerCondition })}
+        />
+      )}
       {input.doorConfig.hasDoor && input.rows > 1 && (
         <Segmented
           label="Extra rows"
@@ -1468,7 +1662,7 @@ function ElevationPreview({
   onPreviewModeChange: (mode: PreviewMode) => void;
   showAssemblyNumbers: boolean;
   selectedAssemblyMark: string | null;
-  onSelectAssembly: (mark: string, type: AssemblySelectionType) => void;
+  onSelectAssembly: (mark: string, type: SelectionTargetType) => void;
   onSelectElevation: (elevationId: string) => void;
 }) {
   if (previewMode === "plan" && cornerPlan) {
@@ -1480,13 +1674,17 @@ function ElevationPreview({
   const doorGlassCallouts = getDoorGlassCalloutMap(elevation.computedGlass.items);
   const visibleAssemblyCallouts = geometry.assemblyCallouts.filter((callout) => shouldShowAssemblyCallout(callout, showAssemblyNumbers));
   const mainAssemblyRegions = getMainAssemblyRegions(elevation);
-  const selectedRegion = mainAssemblyRegions.find((region) => region.mark === selectedAssemblyMark);
+  const liteRegions = getLiteSelectionRegions(elevation);
+  const kneeWallRegions = getKneeWallSelectionRegions(elevation);
+  const selectionRegions = [...mainAssemblyRegions, ...liteRegions, ...kneeWallRegions];
+  const selectedRegion = selectionRegions.find((region) => getSelectionKey(region) === selectedAssemblyMark);
   const cornerSides = getElevationCornerSides(elevation, jobElevations);
   const cornerMullionSightline = geometry.sightlines.cornerMullion ?? geometry.sightlines.verticalMullion * 2;
+  const elevationLabel = getElevationPlanLabel(jobElevations, elevation.id);
   const handleRegionKeyDown = (event: KeyboardEvent<SVGRectElement>, region: AssemblyRegion) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      onSelectAssembly(region.mark, region.type);
+      onSelectAssembly(getSelectionKey(region), region.type);
     }
   };
 
@@ -1494,8 +1692,8 @@ function ElevationPreview({
     <section className="drawing-preview">
       <div className="preview-header">
         <strong>Elevation Preview</strong>
+        <span className="preview-elevation-label">Elevation {elevationLabel}</span>
         <div className="preview-header-actions">
-          <span>{formatFeetInches(geometry.frameWidth)} x {formatFeetInches(geometry.frameHeight)}</span>
           {cornerPlan && (
             <div className="preview-toggle" aria-label="Preview mode">
               <button type="button" className="selected" onClick={() => onPreviewModeChange("elevation")}>Elevation</button>
@@ -1506,6 +1704,16 @@ function ElevationPreview({
       </div>
       <svg viewBox={viewBox} role="img" aria-label="Computed storefront elevation">
         <rect x="0" y="0" width={geometry.frameWidth} height={geometry.frameHeight} className="svg-frame" />
+        {geometry.kneeWalls.map((kneeWall) => (
+          <rect
+            key={kneeWall.id}
+            x={kneeWall.x}
+            y={geometry.frameHeight - kneeWall.y - kneeWall.height}
+            width={kneeWall.width}
+            height={kneeWall.height}
+            className="svg-knee-wall"
+          />
+        ))}
         {geometry.members.map((member) => (
           <rect
             key={member.id}
@@ -1527,14 +1735,19 @@ function ElevationPreview({
           />
         ))}
         {cornerSides.map((side) => (
-          <rect
-            key={`corner-member-${side}`}
-            x={side === "left" ? 0 : geometry.frameWidth - cornerMullionSightline}
-            y={0}
-            width={cornerMullionSightline}
-            height={geometry.frameHeight}
-            className="svg-corner-member"
-          />
+          (() => {
+            const span = getCornerDisplaySpan(geometry, side);
+            return (
+              <rect
+                key={`corner-member-${side}`}
+                x={side === "left" ? 0 : geometry.frameWidth - cornerMullionSightline}
+                y={geometry.frameHeight - span.y - span.height}
+                width={cornerMullionSightline}
+                height={span.height}
+                className="svg-corner-member"
+              />
+            );
+          })()
         ))}
         {geometry.doorOpenings.map((door, doorIndex) => (
           <g key={door.id}>
@@ -1612,6 +1825,17 @@ function ElevationPreview({
             </text>
           );
         })}
+        {geometry.kneeWalls.map((kneeWall) => (
+          <text
+            key={`${kneeWall.id}-label`}
+            x={kneeWall.x + kneeWall.width / 2}
+            y={geometry.frameHeight - kneeWall.height / 2}
+            className="svg-knee-wall-label"
+            textAnchor="middle"
+          >
+            KW
+          </text>
+        ))}
         {mainAssemblyRegions.map((region) => (
           <rect
             key={`hit-${region.mark}`}
@@ -1623,14 +1847,29 @@ function ElevationPreview({
             role="button"
             tabIndex={0}
             aria-label={`Edit ${region.type === "door" ? "door assembly" : "column assembly"} ${region.mark} area`}
-            onClick={() => onSelectAssembly(region.mark, region.type)}
+            onClick={() => onSelectAssembly(getSelectionKey(region), region.type)}
+            onKeyDown={(event) => handleRegionKeyDown(event, region)}
+          />
+        ))}
+        {[...liteRegions, ...kneeWallRegions].map((region) => (
+          <rect
+            key={`hit-${getSelectionKey(region)}`}
+            x={region.x}
+            y={geometry.frameHeight - region.y - region.height}
+            width={region.width}
+            height={region.height}
+            className="svg-assembly-hit-area lite-hit"
+            role="button"
+            tabIndex={0}
+            aria-label={`Edit ${region.type === "knee-wall" ? "knee-wall" : "lite"} ${region.mark} area`}
+            onClick={() => onSelectAssembly(getSelectionKey(region), region.type)}
             onKeyDown={(event) => handleRegionKeyDown(event, region)}
           />
         ))}
         {visibleAssemblyCallouts
           .filter((callout) => callout.level === "assembly" && (callout.type === "column" || callout.type === "door"))
           .map((callout) => {
-            const type = callout.type as AssemblySelectionType;
+            const type = callout.type as SelectionTargetType;
             const region: AssemblyRegion = {
               mark: callout.mark,
               type,
@@ -1650,7 +1889,7 @@ function ElevationPreview({
                 role="button"
                 tabIndex={0}
                 aria-label={`Edit ${type === "door" ? "door assembly" : "column assembly"} ${callout.mark}`}
-                onClick={() => onSelectAssembly(callout.mark, type)}
+                onClick={() => onSelectAssembly(getSelectionKey(region), type)}
                 onKeyDown={(event) => handleRegionKeyDown(event, region)}
               />
             );
@@ -1660,7 +1899,7 @@ function ElevationPreview({
             key={callout.id}
             x={callout.x}
             y={geometry.frameHeight - callout.y}
-            className={`svg-assembly-label ${callout.level} ${callout.mark === selectedAssemblyMark ? "selected" : ""}`}
+            className={`svg-assembly-label ${callout.level} ${isCalloutSelected(callout, selectedAssemblyMark) ? "selected" : ""}`}
             textAnchor={callout.type === "lite" || callout.type === "transom" ? "start" : "middle"}
           >
             {callout.mark}
@@ -1693,8 +1932,10 @@ function CornerPlanPreview({
     <section className="drawing-preview">
       <div className="preview-header">
         <strong>Plan View</strong>
+        <span className="preview-elevation-label">
+          {plan.segments.length} elevation{plan.segments.length === 1 ? "" : "s"}
+        </span>
         <div className="preview-header-actions">
-          <span>{plan.segments.length} elevation{plan.segments.length === 1 ? "" : "s"}</span>
           <div className="preview-toggle" aria-label="Preview mode">
             <button type="button" onClick={() => onPreviewModeChange("elevation")}>Elevation</button>
             <button type="button" className="selected" onClick={() => onPreviewModeChange("plan")}>Plan</button>
@@ -1783,6 +2024,53 @@ function getMainAssemblyRegions(elevation: Elevation): AssemblyRegion[] {
   }));
 
   return [...columnRegions, ...doorRegions];
+}
+
+function getLiteSelectionRegions(elevation: Elevation): AssemblyRegion[] {
+  return elevation.computedGeometry.lites.map((lite) => ({
+    mark: lite.mark,
+    type: "lite",
+    elementId: lite.id,
+    x: lite.dloX,
+    y: lite.dloY,
+    width: lite.dloWidth,
+    height: lite.dloHeight
+  }));
+}
+
+function getKneeWallSelectionRegions(elevation: Elevation): AssemblyRegion[] {
+  return elevation.computedGeometry.kneeWalls.map((kneeWall) => ({
+    mark: "KW",
+    type: "knee-wall",
+    elementId: kneeWall.id,
+    x: kneeWall.x,
+    y: kneeWall.y,
+    width: kneeWall.width,
+    height: kneeWall.height
+  }));
+}
+
+function getSelectionKey(region: Pick<AssemblyRegion, "mark" | "type" | "elementId">): string {
+  if (region.type === "lite") return `L:${region.elementId}`;
+  if (region.type === "knee-wall") return `KW:${region.elementId}`;
+  return region.mark;
+}
+
+function isCalloutSelected(
+  callout: Elevation["computedGeometry"]["assemblyCallouts"][number],
+  selectedKey: string | null
+): boolean {
+  if (callout.level === "assembly") return callout.mark === selectedKey;
+  return selectedKey === `L:${callout.elementId}`;
+}
+
+function getCornerDisplaySpan(geometry: ComputedGeometry, side: CornerSide): { y: number; height: number } {
+  const columnIndex = side === "left" ? 0 : geometry.columnWidths.length - 1;
+  const kneeWallHeight = geometry.kneeWalls.find((kneeWall) => kneeWall.columnIndex === columnIndex)?.height ?? 0;
+  return {
+    y: kneeWallHeight,
+    height: Math.max(geometry.frameHeight - kneeWallHeight, 0)
+  };
 }
 
 function ValidationList({ elevation }: { elevation: Elevation }) {
@@ -2149,6 +2437,9 @@ function toInput(elevation: Elevation): ElevationInput {
       columnIndex: normalizedDoorColumn
     },
     cornerConfig: normalizeCornerConfig(elevation.cornerConfig),
+    cornerSides: elevation.cornerSides,
+    kneeWalls: normalizeKneeWallConfigs(elevation.kneeWalls, columns),
+    liteSplits: normalizeLiteSplitConfigs(elevation.liteSplits, elevation.rows, columns),
     finishConfig: elevation.finishConfig,
     glassConfig: elevation.glassConfig,
     systemRulePackId: elevation.systemRulePackId,
@@ -2230,7 +2521,9 @@ function inheritCornerReturnPatternOnLoad(
       side: sourceCorner.side,
       angle: 90,
       condition: "outside"
-    }
+    },
+    cornerSides: [oppositeCornerSide(sourceCorner.side)],
+    kneeWalls: buildCornerReturnKneeWalls(toInput(sourceElevation), sourceCorner.side)
   });
 }
 
@@ -2265,13 +2558,32 @@ function createCornerReturnElevationInput(
     columnSizingMode: "equal",
     columnWidths: buildBlankSizingInputs(source.columns),
     doorConfig: createNoDoorConfig(source.doorConfig),
+    liteSplits: [],
     cornerConfig: {
       hasCorner: false,
       side: source.cornerConfig.side,
       angle: 90,
       condition: source.cornerConfig.condition
-    }
+    },
+    cornerSides: [oppositeCornerSide(source.cornerConfig.side)],
+    kneeWalls: buildCornerReturnKneeWalls(source, source.cornerConfig.side)
   });
+}
+
+function withEffectiveCornerSides(input: ElevationInput, elevations: Elevation[]): ElevationInput {
+  const sides = getEffectiveCornerSides(input, elevations);
+  return { ...input, cornerSides: sides };
+}
+
+function getEffectiveCornerSides(input: ElevationInput, elevations: Elevation[]): CornerSide[] {
+  const sides = new Set<CornerSide>();
+  const corner = normalizeCornerConfig(input.cornerConfig);
+  if (corner.hasCorner) sides.add(corner.side);
+  const incomingParent = getIncomingCornerParent(input.id, elevations);
+  if (incomingParent) {
+    sides.add(oppositeCornerSide(normalizeCornerConfig(incomingParent.cornerConfig).side));
+  }
+  return Array.from(sides);
 }
 
 function createNoDoorConfig(source: DoorConfig): DoorConfig {
@@ -2371,6 +2683,165 @@ function getJobPlanContext(
     cornerSightline,
     activeElevationId: activeElevation.id
   };
+}
+
+function getSelectedColumnIndex(mark: string | null, columns: number): number | null {
+  if (!mark?.startsWith("A")) return null;
+  const parsed = Number(mark.slice(1));
+  if (!Number.isFinite(parsed)) return null;
+  return clampIndex(parsed - 1, columns);
+}
+
+function getSelectedLite(selectedKey: string | null, elevation: Elevation): Lite | null {
+  if (!selectedKey?.startsWith("L:")) return null;
+  const liteId = selectedKey.slice(2);
+  return elevation.computedGeometry.lites.find((lite) => lite.id === liteId) ?? null;
+}
+
+function getSelectedKneeWallColumnIndex(selectedKey: string | null, elevation: Elevation): number | null {
+  if (!selectedKey?.startsWith("KW:")) return null;
+  const kneeWallId = selectedKey.slice(3);
+  return elevation.computedGeometry.kneeWalls.find((kneeWall) => kneeWall.id === kneeWallId)?.columnIndex ?? null;
+}
+
+function getKneeWallControlState(
+  input: ElevationInput,
+  elevation: Elevation,
+  selectedColumnIndex: number | null
+):
+  | {
+      assemblyMark: string;
+      canAdd: boolean;
+      columnIndex: number;
+      defaultHeight: number;
+      description: string;
+      existingWall?: KneeWallConfig;
+      reason: string;
+      title: string;
+    }
+  | null {
+  if (selectedColumnIndex === null) return null;
+
+  const walls = normalizeKneeWallConfigs(input.kneeWalls, input.columns);
+  const existingWall = walls.find((wall) => wall.columnIndex === selectedColumnIndex);
+  const doorColumns = getDoorColumnIndexes(input);
+  const assemblyMark = `A${selectedColumnIndex + 1}`;
+  const isDoorColumn = doorColumns.has(selectedColumnIndex);
+  const defaultHeight = getDefaultKneeWallHeight(elevation);
+  const canAdd = !isDoorColumn && isKneeWallColumnEligible(selectedColumnIndex, input.columns, walls);
+  const reason = isDoorColumn
+    ? "Knee-walls are not available in a door bay."
+    : "Start from the left-most or right-most assembly, then grow knee-walls inward one assembly at a time.";
+
+  return {
+    assemblyMark,
+    canAdd,
+    columnIndex: selectedColumnIndex,
+    defaultHeight,
+    description: existingWall
+      ? `This knee-wall spans the full width of ${assemblyMark}.`
+      : canAdd
+        ? `Default height is one-third of the bottom row: ${formatInches(defaultHeight)}.`
+        : `Select an outside assembly first to unlock ${assemblyMark}.`,
+    existingWall,
+    reason,
+    title: `Knee-wall ${assemblyMark}`
+  };
+}
+
+function getLiteSplitControlState(
+  input: ElevationInput,
+  lite: Lite | null
+):
+  | {
+      description: string;
+      existingSplit?: LiteSplitConfig;
+      title: string;
+    }
+  | null {
+  if (!lite) return null;
+  const existingSplit = normalizeLiteSplitConfigs(input.liteSplits, input.rows, input.columns).find(
+    (split) => split.rowIndex === lite.rowIndex && split.columnIndex === lite.columnIndex
+  );
+
+  return {
+    description: existingSplit
+      ? `${lite.mark} is split into ${existingSplit.count} vertical lites. The added vertical runs from the raised sill/top of sill to the next horizontal.`
+      : `Split ${lite.mark} within A${lite.columnIndex + 1} without changing the row above or below.`,
+    existingSplit,
+    title: `Lite ${lite.mark}`
+  };
+}
+
+function getDefaultKneeWallHeight(elevation: Elevation): number {
+  const bottomRowHeight = elevation.computedGeometry.rowHeights[0] ?? elevation.computedGeometry.frameHeight;
+  return roundDimension(bottomRowHeight / 3);
+}
+
+function isKneeWallColumnEligible(columnIndex: number, columns: number, walls: KneeWallConfig[]): boolean {
+  if (columnIndex === 0 || columnIndex === columns - 1) return true;
+  const wallColumns = new Set(walls.map((wall) => wall.columnIndex));
+  return wallColumns.has(columnIndex - 1) || wallColumns.has(columnIndex + 1);
+}
+
+function getDoorColumnIndexes(input: ElevationInput): Set<number> {
+  if (!input.doorConfig.hasDoor) return new Set();
+  return new Set(
+    getDoorSets(input.doorConfig, input.rows, input.columns).map((doorSet) =>
+      doorSet.columnIndex ?? getDoorColumnIndex(input.columns, doorSet.locationMode)
+    )
+  );
+}
+
+function normalizeKneeWallConfigs(walls: KneeWallConfig[] | undefined, columns: number): KneeWallConfig[] {
+  return uniqueKneeWalls(walls ?? []).filter((wall) => wall.columnIndex >= 0 && wall.columnIndex < columns);
+}
+
+function uniqueKneeWalls(walls: KneeWallConfig[]): KneeWallConfig[] {
+  const byColumn = new Map<number, KneeWallConfig>();
+  walls.forEach((wall) => {
+    const columnIndex = Math.round(wall.columnIndex);
+    const height = sanitizeCustomSizingValue(wall.height);
+    if (height <= 0) return;
+    byColumn.set(columnIndex, { columnIndex, height });
+  });
+  return Array.from(byColumn.values()).sort((left, right) => left.columnIndex - right.columnIndex);
+}
+
+function normalizeLiteSplitConfigs(
+  splits: LiteSplitConfig[] | undefined,
+  rows: number,
+  columns: number
+): LiteSplitConfig[] {
+  return uniqueLiteSplits(splits ?? []).filter(
+    (split) => split.rowIndex >= 0 && split.rowIndex < rows && split.columnIndex >= 0 && split.columnIndex < columns
+  );
+}
+
+function uniqueLiteSplits(splits: LiteSplitConfig[]): LiteSplitConfig[] {
+  const byCell = new Map<string, LiteSplitConfig>();
+  splits.forEach((split) => {
+    const rowIndex = Math.max(0, Math.round(split.rowIndex));
+    const columnIndex = Math.max(0, Math.round(split.columnIndex));
+    const count = Math.max(2, Math.min(Math.round(split.count || 2), 4));
+    byCell.set(`${rowIndex}:${columnIndex}`, {
+      rowIndex,
+      columnIndex,
+      orientation: split.orientation === "horizontal" ? "horizontal" : "vertical",
+      count
+    });
+  });
+  return Array.from(byCell.values()).sort(
+    (left, right) => left.rowIndex - right.rowIndex || left.columnIndex - right.columnIndex
+  );
+}
+
+function buildCornerReturnKneeWalls(source: ElevationInput, sourceCornerSide: CornerSide): KneeWallConfig[] {
+  const sourceColumnIndex = sourceCornerSide === "right" ? source.columns - 1 : 0;
+  const sourceWall = normalizeKneeWallConfigs(source.kneeWalls, source.columns).find(
+    (wall) => wall.columnIndex === sourceColumnIndex
+  );
+  return sourceWall ? [{ columnIndex: 0, height: sourceWall.height }] : [];
 }
 
 function rotatePlanDirection(
@@ -2743,6 +3214,8 @@ function normalizeLayoutSizingInput(
 
   return {
     ...normalizedInput,
+    kneeWalls: normalizeKneeWallConfigs(input.kneeWalls, input.columns),
+    liteSplits: normalizeLiteSplitConfigs(input.liteSplits, input.rows, input.columns),
     rowHeights: normalizeCustomSizingValues(
       "row",
       resizeCustomSizingInputs(input.rowHeights, input.rows),

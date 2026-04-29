@@ -157,6 +157,7 @@ h2 {
   grid-template-columns: minmax(0, 1fr) 390px;
   gap: 16px;
   align-items: start;
+  padding-bottom: 92px;
 }
 
 .work-panel,
@@ -288,6 +289,36 @@ h2 {
   color: #64748b;
   font-size: 0.82rem;
   line-height: 1.45;
+}
+
+.knee-wall-panel {
+  display: grid;
+  gap: 10px;
+  margin: -2px 0 14px;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.knee-wall-panel > div:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.knee-wall-panel strong {
+  color: #111827;
+}
+
+.knee-wall-panel span {
+  color: #64748b;
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.knee-wall-panel .field,
+.knee-wall-panel .layout-note {
+  margin: 0;
 }
 
 .segmented,
@@ -433,8 +464,7 @@ h2 {
   border-radius: 8px;
   background: #ffffff;
   color: #334155;
-  padding: 10px;
-  text-align: left;
+  padding: 4px;
 }
 
 .elevation-row.selected {
@@ -442,20 +472,45 @@ h2 {
   background: #eef5ea;
 }
 
-.elevation-row span {
-  display: grid;
-  gap: 3px;
+.elevation-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 6px;
+  text-align: left;
 }
 
-.elevation-row strong {
+.elevation-row-main span {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.elevation-row-main strong {
   color: #111827;
 }
 
-.elevation-row small,
+.elevation-row-main small,
 .elevation-hub > span {
   color: #64748b;
   font-size: 0.78rem;
   font-weight: 800;
+}
+
+.icon-button.danger {
+  border-color: #fecaca;
+  color: #b91c1c;
+}
+
+.icon-button.danger:disabled {
+  cursor: not-allowed;
+  opacity: 0.35;
 }
 
 .job-management {
@@ -511,26 +566,35 @@ h2 {
 }
 
 .preview-header {
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
   align-items: center;
-  justify-content: space-between;
   gap: 10px;
   margin-bottom: 10px;
   font-size: 0.86rem;
+}
+
+.preview-header > strong {
+  justify-self: start;
+}
+
+.preview-elevation-label {
+  justify-self: center;
+  min-width: 0;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-align: center;
+  white-space: nowrap;
 }
 
 .preview-header-actions {
   display: inline-flex;
   align-items: center;
   justify-content: flex-end;
+  justify-self: end;
   gap: 8px;
   min-width: 0;
-}
-
-.preview-header span {
-  color: #64748b;
-  font-size: 0.78rem;
-  font-weight: 800;
 }
 
 .preview-toggle {
@@ -573,14 +637,14 @@ h2 {
 .svg-door-leaf,
 .svg-door-glass,
 .svg-door-dash,
+.svg-knee-wall,
 .svg-corner-member {
   vector-effect: non-scaling-stroke;
 }
 
 .svg-frame {
   fill: #ffffff;
-  stroke: #111827;
-  stroke-width: 1.4;
+  stroke: none;
 }
 
 .svg-lite {
@@ -630,6 +694,23 @@ h2 {
   stroke: #475569;
   stroke-width: 0.75;
   stroke-dasharray: 2 1.5;
+}
+
+.svg-knee-wall {
+  fill: #e2e8f0;
+  stroke: #334155;
+  stroke-width: 0.8;
+}
+
+.svg-knee-wall-label {
+  fill: #334155;
+  font-size: 4px;
+  font-weight: 900;
+  paint-order: stroke fill;
+  pointer-events: none;
+  stroke: #ffffff;
+  stroke-linejoin: round;
+  stroke-width: 0.8px;
 }
 
 .svg-plan-leg,
@@ -724,6 +805,16 @@ h2 {
   stroke: #ca8a04;
 }
 
+.svg-assembly-highlight.lite {
+  fill: rgba(37, 99, 235, 0.16);
+  stroke: #2563eb;
+}
+
+.svg-assembly-highlight.knee-wall {
+  fill: rgba(71, 85, 105, 0.16);
+  stroke: #475569;
+}
+
 .svg-assembly-hit-area {
   cursor: pointer;
   fill: rgba(255, 255, 255, 0.001);
@@ -737,6 +828,10 @@ h2 {
   stroke: #48652f;
   stroke-dasharray: 3 2;
   stroke-width: 2px;
+}
+
+.svg-assembly-hit-area.lite-hit:focus-visible {
+  stroke: #2563eb;
 }
 
 .svg-assembly-label {
@@ -876,15 +971,16 @@ h2 {
 .nav-actions {
   position: sticky;
   bottom: 0;
-  z-index: 5;
+  z-index: 30;
   display: flex;
   gap: 10px;
   justify-content: space-between;
   margin: 16px -16px -22px;
   border-top: 1px solid #d9e2ec;
-  background: rgba(248, 250, 252, 0.94);
+  background: #f8fafc;
   padding: 12px 16px max(12px, env(safe-area-inset-bottom));
   backdrop-filter: blur(12px);
+  box-shadow: 0 -12px 28px rgba(15, 23, 42, 0.08);
 }
 
 .admin-backdrop {
@@ -959,6 +1055,7 @@ h2 {
 @media (max-width: 920px) {
   .workspace {
     grid-template-columns: 1fr;
+    padding-bottom: 120px;
   }
 
   .preview-panel {
@@ -969,6 +1066,15 @@ h2 {
     padding-top: 16px;
     padding-bottom: 10px;
     background: #f8fafc;
+  }
+
+  .drawing-preview {
+    padding: 10px;
+  }
+
+  .drawing-preview svg {
+    aspect-ratio: 1.7 / 1;
+    max-height: min(300px, 42vh);
   }
 }
 

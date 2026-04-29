@@ -18,6 +18,7 @@ import {
 } from "../src/domain/glass";
 import { getDoorColumnIndex } from "../src/domain/geometry";
 import { createSquaredMeasurementSet, getGoverningDimensions } from "../src/domain/measurements";
+import { buildMetalTakeoff } from "../src/domain/metal";
 import { calculateQuoteSummary } from "../src/domain/quote";
 import { createRevisionSnapshot, getNextRevisionNumber } from "../src/domain/revision";
 import type { ElevationInput } from "../src/domain/types";
@@ -182,6 +183,114 @@ describe("FG-2000 calculation engine", () => {
     expect(quote.total).toBe(7033.62);
   });
 
+  it("groups generated storefront members into a metal takeoff", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+    const takeoff = buildMetalTakeoff([elevation]);
+
+    expect(takeoff.totalLinearFeet).toBe(72.94);
+    expect(takeoff.items.map((item) => item.role)).toEqual([
+      "jamb",
+      "door-jamb",
+      "head",
+      "sill",
+      "horizontal-mullion"
+    ]);
+    expect(takeoff.items.find((item) => item.role === "jamb")).toMatchObject({
+      label: "Jamb",
+      qty: 2,
+      totalLinearFeet: 17.94,
+      elevationBreakdown: [{ label: "E1", qty: 2 }]
+    });
+    expect(takeoff.items.find((item) => item.role === "door-jamb")).toMatchObject({
+      qty: 2,
+      totalLinearFeet: 17.94,
+      elevationBreakdown: [{ label: "E1", qty: 2 }]
+    });
+  });
+
+  it("shortens bottom-row glass where a knee-wall is added", () => {
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        kneeWalls: [{ columnIndex: 0, height: 16 }]
+      },
+      context
+    );
+    const bottomLeftLite = elevation.computedGeometry.lites.find((lite) => lite.rowIndex === 0 && lite.columnIndex === 0);
+
+    expect(elevation.computedGeometry.kneeWalls).toMatchObject([
+      { columnIndex: 0, height: 16 }
+    ]);
+    expect(elevation.computedGeometry.members.find((member) => member.id === "member-left-jamb")).toMatchObject({
+      y: 16,
+      height: 79.375
+    });
+    expect(bottomLeftLite?.height).toBeCloseTo(31.688);
+    expect(bottomLeftLite?.dloY).toBeCloseTo(17.75);
+    expect(bottomLeftLite?.glassHeight).toBe(29.6875);
+    expect(elevation.computedGlass.items.map((item) => ({ mark: item.mark, qty: item.qty, height: item.height }))).toEqual([
+      { mark: "G1", qty: 1, height: 29.6875 },
+      { mark: "G2", qty: 3, height: 45.6875 }
+    ]);
+  });
+
+  it("stops a corner mullion at the raised sill when the edge assembly has a knee-wall", () => {
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        columns: 3,
+        cornerConfig: {
+          hasCorner: true,
+          side: "right",
+          angle: 90,
+          condition: "outside"
+        },
+        kneeWalls: [{ columnIndex: 2, height: 16 }]
+      },
+      context
+    );
+    const corner = elevation.computedGeometry.members.find((member) => member.role === "corner");
+
+    expect(corner).toMatchObject({
+      y: 16,
+      height: 79.375
+    });
+  });
+
+  it("can split a selected bottom-row lite vertically without changing the top row", () => {
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        columns: 3,
+        liteSplits: [{ rowIndex: 0, columnIndex: 1, orientation: "vertical", count: 2 }]
+      },
+      context
+    );
+    const bottomA2Lites = elevation.computedGeometry.lites.filter(
+      (lite) => lite.rowIndex === 0 && lite.columnIndex === 1
+    );
+    const topA2Lites = elevation.computedGeometry.lites.filter(
+      (lite) => lite.rowIndex === 1 && lite.columnIndex === 1
+    );
+    const splitMember = elevation.computedGeometry.members.find((member) => member.id === "member-lite-split-v-r1-c2-1");
+
+    expect(bottomA2Lites).toHaveLength(2);
+    expect(new Set(bottomA2Lites.map((lite) => lite.glassWidth))).toEqual(new Set([22.5]));
+    expect(topA2Lites).toHaveLength(1);
+    expect(topA2Lites[0].glassWidth).toBe(46.0625);
+    expect(splitMember).toMatchObject({
+      role: "vertical-mullion",
+      y: 1.75,
+      width: 1.75,
+      height: 45.063
+    });
+    expect(elevation.computedGlass.items.find((item) => item.mark === "G2")).toMatchObject({
+      qty: 2,
+      width: 22.5,
+      location: "R1C2, R1C2"
+    });
+  });
+
   it("uses the selected second row as the transom row above an 84 inch door", () => {
     const elevation = calculateElevation(pairDoorSeedInput, context);
 
@@ -219,7 +328,7 @@ describe("FG-2000 calculation engine", () => {
     expect(elevation.computedGeometry.bays[0].width).toBeCloseTo(71.688);
   });
 
-  it("adds a corner note when a 90 degree return is configured", () => {
+  it("adds a corner note when a return is configured", () => {
     const elevation = calculateElevation(
       {
         ...noDoorSeedInput,
@@ -234,8 +343,45 @@ describe("FG-2000 calculation engine", () => {
       context
     );
 
-    expect(elevation.computedGeometry.notes.some((note) => note.includes("90 degree outside left return"))).toBe(true);
+    expect(elevation.computedGeometry.notes.some((note) => note.includes("outside left return"))).toBe(true);
     expect(elevation.computedGeometry.notes.some((note) => note.includes("3.5 in"))).toBe(true);
+  });
+
+  it("keeps door openings clear of corner mullion sightlines", () => {
+    const elevation = calculateElevation(
+      {
+        ...pairDoorSeedInput,
+        doorConfig: {
+          ...pairDoorSeedInput.doorConfig,
+          doorType: "single",
+          widthPerLeaf: 36,
+          locationMode: "custom",
+          columnIndex: 0,
+          doorSetCount: 1,
+          doorSets: [
+            {
+              ...pairDoorSeedInput.doorConfig.doorSets[0],
+              doorType: "single",
+              widthPerLeaf: 36,
+              locationMode: "custom",
+              columnIndex: 0
+            }
+          ]
+        },
+        cornerConfig: {
+          hasCorner: true,
+          side: "left",
+          angle: 90,
+          condition: "outside"
+        }
+      },
+      context
+    );
+    const corner = elevation.computedGeometry.members.find((member) => member.role === "corner");
+    const door = elevation.computedGeometry.doorOpenings[0];
+
+    expect(corner?.width).toBeCloseTo(3.5);
+    expect(door.x).toBeCloseTo(3.5);
   });
 
   it("can preserve a source door-line row height on a no-door corner return", () => {

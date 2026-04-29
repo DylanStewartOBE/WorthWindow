@@ -14,11 +14,13 @@ export type LiteType = "fixed" | "sidelite" | "transom" | "door-adjacent-lite";
 export type BayType = "lite" | "door" | "transom";
 export type DimensionOrientation = "horizontal" | "vertical";
 export type LayoutSizingMode = "equal" | "custom";
+export type LiteSplitOrientation = "vertical" | "horizontal";
 export type AssemblyCalloutLevel = "assembly" | "subassembly";
 export type AssemblyCalloutType = "column" | "door" | "lite" | "transom" | "door-leaf";
 export type MemberRole =
   | "left-jamb"
   | "right-jamb"
+  | "corner"
   | "vertical-mullion"
   | "door-jamb"
   | "head"
@@ -89,6 +91,18 @@ export interface CornerConfig {
   linkedElevationId?: string;
 }
 
+export interface KneeWallConfig {
+  columnIndex: number;
+  height: Inches;
+}
+
+export interface LiteSplitConfig {
+  rowIndex: number;
+  columnIndex: number;
+  orientation: LiteSplitOrientation;
+  count: number;
+}
+
 export interface Job {
   id: string;
   name: string;
@@ -118,6 +132,9 @@ export interface ElevationInput {
   columnWidths: Inches[];
   doorConfig: DoorConfig;
   cornerConfig: CornerConfig;
+  cornerSides?: CornerSide[];
+  kneeWalls: KneeWallConfig[];
+  liteSplits: LiteSplitConfig[];
   finishConfig: FinishConfig;
   glassConfig: GlassConfig;
   systemRulePackId: string;
@@ -149,6 +166,7 @@ export interface ComputedGeometry {
   bays: Bay[];
   members: MemberSegment[];
   lites: Lite[];
+  kneeWalls: KneeWall[];
   transoms: Transom[];
   doorOpenings: DoorOpening[];
   assemblyCallouts: AssemblyCallout[];
@@ -193,6 +211,15 @@ export interface Lite {
   safetyGlazingLikely: boolean;
   quantity: number;
   mark: string;
+}
+
+export interface KneeWall {
+  id: string;
+  columnIndex: number;
+  x: Inches;
+  y: Inches;
+  width: Inches;
+  height: Inches;
 }
 
 export interface Transom {

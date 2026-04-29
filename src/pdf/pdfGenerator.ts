@@ -10,6 +10,7 @@ import {
   getTotalGlassWeightPounds
 } from "../domain/glass";
 import { formatFeetInches, formatInches } from "../domain/format";
+import { getKneeWallRuns } from "../domain/kneeWall";
 import { buildMetalTakeoff, type MetalTakeoffLine } from "../domain/metal";
 import { calculateJobQuoteSummary, calculateQuoteSummary } from "../domain/quote";
 import type { BrandingConfig, Elevation, GlassItem, Job, Lite, ValidationFlag } from "../domain/types";
@@ -264,7 +265,9 @@ function drawElevation(
   doc.setDrawColor(17, 24, 39);
   doc.rect(originX, originY, drawingWidth, drawingHeight);
 
-  geometry.kneeWalls.forEach((kneeWall) => {
+  const kneeWallRuns = getKneeWallRuns(geometry.kneeWalls);
+
+  kneeWallRuns.forEach((kneeWall) => {
     const px = originX + kneeWall.x * scale;
     const py = originY + (geometry.frameHeight - kneeWall.y - kneeWall.height) * scale;
     const pw = kneeWall.width * scale;
@@ -311,7 +314,7 @@ function drawElevation(
   });
 
   geometry.lites.forEach((lite) => drawLiteMark(doc, elevation, lite, originX, originY, scale, jobGlassTakeoff));
-  geometry.kneeWalls.forEach((kneeWall) => {
+  kneeWallRuns.forEach((kneeWall) => {
     const cx = originX + (kneeWall.x + kneeWall.width / 2) * scale;
     const cy = originY + (geometry.frameHeight - kneeWall.y - kneeWall.height / 2) * scale;
     doc.setFont("helvetica", "bold");
@@ -523,8 +526,8 @@ function drawElevationNotes(doc: jsPDF, elevation: Elevation, x: number, y: numb
     `Mullion height: ${formatInches(elevation.computedGeometry.memberCalcs.mullionHeight)}`,
     ...(elevation.computedGeometry.kneeWalls.length
       ? [
-          `Knee-walls: ${elevation.computedGeometry.kneeWalls
-            .map((kneeWall) => `A${kneeWall.columnIndex + 1} ${formatInches(kneeWall.height)}`)
+          `Knee-walls: ${getKneeWallRuns(elevation.computedGeometry.kneeWalls)
+            .map((kneeWall) => `${formatKneeWallRunLabel(kneeWall.columnIndex, kneeWall.endColumnIndex)} ${formatInches(kneeWall.height)}`)
             .join(", ")}`
         ]
       : [])
@@ -1159,6 +1162,11 @@ function formatSquareFeet(value: number): string {
 
 function formatWeight(value: number): string {
   return value.toFixed(1);
+}
+
+function formatKneeWallRunLabel(startColumnIndex: number, endColumnIndex: number): string {
+  if (startColumnIndex === endColumnIndex) return `A${startColumnIndex + 1}`;
+  return `A${startColumnIndex + 1}-A${endColumnIndex + 1}`;
 }
 
 function formatCurrency(value: number): string {

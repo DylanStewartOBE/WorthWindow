@@ -321,6 +321,12 @@ h2 {
   margin: 0;
 }
 
+.split-action-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(134px, 1fr));
+  gap: 8px;
+}
+
 .segmented,
 .check-group {
   margin: 0 0 14px;
@@ -579,13 +585,39 @@ h2 {
 }
 
 .preview-elevation-label {
-  justify-self: center;
   min-width: 0;
   color: #64748b;
   font-size: 0.78rem;
   font-weight: 800;
   text-align: center;
   white-space: nowrap;
+}
+
+.preview-elevation-control {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  justify-self: center;
+  gap: 4px;
+  min-width: 0;
+}
+
+.preview-nav-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  min-height: 28px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #334155;
+  padding: 0;
+}
+
+.preview-nav-button:disabled {
+  cursor: default;
+  color: #cbd5e1;
 }
 
 .preview-header-actions {
@@ -619,6 +651,34 @@ h2 {
 .preview-toggle button.selected {
   background: #dfead7;
   color: #48652f;
+}
+
+.preview-action-button {
+  min-height: 28px;
+  border: 1px solid #cbd5e1;
+  border-radius: 7px;
+  background: #ffffff;
+  color: #334155;
+  font-size: 0.68rem;
+  font-weight: 900;
+  padding: 4px 9px;
+}
+
+.preview-action-button.selected {
+  border-color: #48652f;
+  background: #48652f;
+  color: #ffffff;
+}
+
+.plan-join-note {
+  margin: -2px 0 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  padding: 8px 10px;
+  font-size: 0.76rem;
+  font-weight: 800;
 }
 
 .drawing-preview svg {
@@ -730,6 +790,12 @@ h2 {
   fill: #dfead7;
   stroke: #48652f;
   stroke-width: 2.2;
+}
+
+.svg-plan-leg.join-selected {
+  fill: #fef3c7;
+  stroke: #ca8a04;
+  stroke-width: 2.5;
 }
 
 .svg-plan-corner {
@@ -1055,7 +1121,24 @@ h2 {
 @media (max-width: 920px) {
   .workspace {
     grid-template-columns: 1fr;
-    padding-bottom: 120px;
+    min-height: calc(100svh - var(--sticky-control-height) - 76px);
+    padding-bottom: 84px;
+  }
+
+  .work-panel {
+    display: grid;
+    max-height: calc(100svh - var(--sticky-control-height) - min(420px, 52vh) - 84px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: none;
+  }
+
+  .work-panel::-webkit-scrollbar {
+    display: none;
+  }
+
+  .work-panel > .step-content {
+    min-height: 100%;
   }
 
   .preview-panel {
@@ -1075,6 +1158,10 @@ h2 {
   .drawing-preview svg {
     aspect-ratio: 1.7 / 1;
     max-height: min(300px, 42vh);
+  }
+
+  .nav-actions {
+    margin-top: 0;
   }
 }
 

@@ -591,11 +591,66 @@ function createLiteDraftsForBay({
   split?: LiteSplitConfig;
   splitMembers: MemberSegment[];
 }): LiteDraft[] {
-  if (!split || split.orientation !== "vertical" || split.count < 2) {
+  if (!split || split.count < 2) {
     return [createLiteDraft(options)];
   }
 
   const segmentCount = Math.max(2, Math.min(Math.round(split.count), 4));
+  if (split.orientation === "horizontal") {
+    const bottomDeduction = getHorizontalBoundaryInset(options.bottomBoundaryType, options.storefrontRules);
+    const topDeduction = getHorizontalBoundaryInset(options.topBoundaryType, options.storefrontRules);
+    const leftInset = getVerticalBoundaryInset(options.leftBoundaryType, options.storefrontRules);
+    const rightInset = getVerticalBoundaryInset(options.rightBoundaryType, options.storefrontRules);
+    const splitMemberHeight = options.storefrontRules.sightlines.horizontalMullion;
+    const clearSpan = Math.max(
+      options.bay.height - bottomDeduction - topDeduction - splitMemberHeight * (segmentCount - 1),
+      0
+    );
+    const segmentDloHeight = clearSpan / segmentCount;
+    const drafts: LiteDraft[] = [];
+    let segmentY = options.bay.y;
+
+    for (let index = 0; index < segmentCount; index += 1) {
+      const isFirst = index === 0;
+      const isLast = index === segmentCount - 1;
+      const segmentBottomDeduction = isFirst ? bottomDeduction : splitMemberHeight / 2;
+      const segmentTopDeduction = isLast ? topDeduction : splitMemberHeight / 2;
+      const height = isLast
+        ? options.bay.y + options.bay.height - segmentY
+        : segmentBottomDeduction + segmentDloHeight + segmentTopDeduction;
+      drafts.push(
+        createLiteDraft({
+          ...options,
+          bay: {
+            ...options.bay,
+            id: `${options.bay.id}-split-h-${index + 1}`,
+            y: segmentY,
+            height,
+            label: `${options.bay.label} horizontal split ${index + 1}`
+          },
+          bottomBoundaryType: isFirst ? options.bottomBoundaryType : "horizontal-mullion",
+          topBoundaryType: isLast ? options.topBoundaryType : "horizontal-mullion"
+        })
+      );
+      segmentY += height;
+    }
+
+    let memberY = options.bay.y + bottomDeduction + segmentDloHeight;
+    for (let index = 1; index < segmentCount; index += 1) {
+      splitMembers.push({
+        id: `member-lite-split-h-r${options.rowIndex + 1}-c${options.columnIndex + 1}-${index}`,
+        role: "horizontal-mullion",
+        x: roundToPrecision(options.bay.x + leftInset),
+        y: roundToPrecision(memberY),
+        width: roundToPrecision(Math.max(options.bay.width - leftInset - rightInset, 0)),
+        height: splitMemberHeight
+      });
+      memberY += splitMemberHeight + segmentDloHeight;
+    }
+
+    return drafts;
+  }
+
   const leftDeduction = getVerticalBoundaryInset(options.leftBoundaryType, options.storefrontRules);
   const rightDeduction = getVerticalBoundaryInset(options.rightBoundaryType, options.storefrontRules);
   const splitMemberWidth = options.storefrontRules.sightlines.verticalMullion;
@@ -852,13 +907,14 @@ function buildNoDoorMembers(
 
   const xPositions = getCumulativePositions(columnWidths);
   for (let columnIndex = 1; columnIndex < columnWidths.length; columnIndex += 1) {
+    const base = getInteriorKneeWallBoundaryHeight(kneeWalls, columnIndex - 1, columnIndex);
     members.push({
       id: `member-v-${columnIndex}`,
       role: "vertical-mullion",
       x: roundToPrecision(xPositions[columnIndex] - storefrontRules.sightlines.verticalMullion / 2),
-      y: 0,
+      y: base,
       width: storefrontRules.sightlines.verticalMullion,
-      height: frameHeight
+      height: roundToPrecision(Math.max(frameHeight - base, 0))
     });
   }
 
@@ -893,7 +949,7 @@ function buildNoDoorMembers(
       const lowerRowLites = lites.filter((lite) => lite.rowIndex === rowIndex - 1);
       lowerRowLites.forEach((lite) => {
         members.push({
-          id: `member-h-${rowIndex}-${lite.columnIndex}`,
+          id: `member-h-${rowIndex}-${lite.id}`,
           role: "horizontal-mullion",
           x: lite.dloX,
           y: roundToPrecision(yPositions[rowIndex] - storefrontRules.sightlines.horizontalMullion / 2),
@@ -948,13 +1004,14 @@ function buildDoorMembers(
       boundaryType === "door-jamb"
         ? storefrontRules.sightlines.doorJamb
         : storefrontRules.sightlines.verticalMullion;
+    const base = getInteriorKneeWallBoundaryHeight(kneeWalls, boundaryIndex - 1, boundaryIndex);
     members.push({
       id: `member-v-${boundaryIndex}`,
       role: boundaryType === "door-jamb" ? "door-jamb" : "vertical-mullion",
       x: roundToPrecision(xPositions[boundaryIndex] - width / 2),
-      y: 0,
+      y: base,
       width,
-      height: frameHeight
+      height: roundToPrecision(Math.max(frameHeight - base, 0))
     });
   }
 
@@ -1026,6 +1083,13 @@ function buildDoorMembers(
 
 function getEdgeKneeWallHeight(kneeWalls: KneeWall[], columnIndex: number): number {
   return roundToPrecision(kneeWalls.find((kneeWall) => kneeWall.columnIndex === columnIndex)?.height ?? 0);
+}
+
+function getInteriorKneeWallBoundaryHeight(kneeWalls: KneeWall[], leftColumnIndex: number, rightColumnIndex: number): number {
+  const leftHeight = getEdgeKneeWallHeight(kneeWalls, leftColumnIndex);
+  const rightHeight = getEdgeKneeWallHeight(kneeWalls, rightColumnIndex);
+  if (leftHeight <= 0 || rightHeight <= 0) return 0;
+  return roundToPrecision(Math.min(leftHeight, rightHeight));
 }
 
 function resolveDoorRowHeights(

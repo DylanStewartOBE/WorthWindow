@@ -35,6 +35,7 @@ import { getDoorLeafVisuals } from "../domain/door";
 import { formatFeetInches, formatInches } from "../domain/format";
 import { getDoorGlassCalloutMap } from "../domain/glass";
 import { getDoorColumnIndex } from "../domain/geometry";
+import { getKneeWallRuns } from "../domain/kneeWall";
 import { createSquaredMeasurementSet } from "../domain/measurements";
 import { createRevisionSnapshot, getNextRevisionNumber } from "../domain/revision";
 import type {
@@ -53,6 +54,7 @@ import type {
   LayoutSizingMode,
   Lite,
   LiteSplitConfig,
+  LiteSplitOrientation,
   NoteLibrary,
   StorefrontRulePack,
   ValidationLibrary
@@ -163,6 +165,8 @@ export function App() {
   const [showAssemblyNumbers, setShowAssemblyNumbers] = useState(false);
   const [selectedAssemblyMark, setSelectedAssemblyMark] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<PreviewMode>("elevation");
+  const [planJoinMode, setPlanJoinMode] = useState(false);
+  const [planJoinSelection, setPlanJoinSelection] = useState<string[]>([]);
   const stepperRef = useRef<HTMLElement | null>(null);
 
   const repository = useMemo(() => createRepository(), []);
@@ -409,6 +413,86 @@ export function App() {
     setActiveStep(2);
   };
 
+  const togglePlanJoinMode = () => {
+    setPlanJoinMode((current) => !current);
+    setPlanJoinSelection([]);
+  };
+
+  const selectPlanJoinElevation = (elevationId: string) => {
+    if (planJoinSelection[0] === elevationId) return;
+    if (planJoinSelection.length === 0) {
+      setPlanJoinSelection([elevationId]);
+      return;
+    }
+    const joined = joinAdjacentElevations(planJoinSelection[0], elevationId);
+    setPlanJoinSelection(joined ? [] : [elevationId]);
+  };
+
+  const joinAdjacentElevations = (firstElevationId: string, secondElevationId: string): boolean => {
+    const firstIndex = jobElevations.findIndex((item) => item.id === firstElevationId);
+    const secondIndex = jobElevations.findIndex((item) => item.id === secondElevationId);
+    if (firstIndex < 0 || secondIndex < 0 || Math.abs(firstIndex - secondIndex) !== 1) {
+      setStatus("Select two adjacent elevations to join.");
+      return false;
+    }
+
+    const [parentIndex, childIndex] = firstIndex < secondIndex ? [firstIndex, secondIndex] : [secondIndex, firstIndex];
+    const parentElevation = jobElevations[parentIndex];
+    const childElevation = jobElevations[childIndex];
+    const parentInput = parentElevation.id === input.id ? input : toInput(parentElevation);
+    const parentCorner = normalizeCornerConfig(parentInput.cornerConfig);
+    const joinSide = getContinuationCornerSide(parentElevation.id, jobElevations) ?? parentCorner.side;
+    const nextParentInput = normalizeLayoutSizingInput({
+      ...parentInput,
+      cornerConfig: {
+        ...parentCorner,
+        hasCorner: true,
+        side: joinSide,
+        angle: 90,
+        linkedElevationId: childElevation.id
+      }
+    });
+    const allElevations = uniqueById([...savedElevations, elevation, ...jobElevations]);
+    let nextElevations = allElevations.map((item) => {
+      if (item.id === parentElevation.id) return calculateElevation(nextParentInput, calculationContext);
+      const corner = normalizeCornerConfig(item.cornerConfig);
+      if (item.id !== parentElevation.id && corner.linkedElevationId === childElevation.id) {
+        return calculateElevation(
+          {
+            ...toInput(item),
+            cornerConfig: { ...corner, hasCorner: false, linkedElevationId: undefined }
+          },
+          calculationContext
+        );
+      }
+      return item;
+    });
+    const childInput = childElevation.id === input.id ? input : toInput(childElevation);
+    const nextChildElevation = calculateElevation(withEffectiveCornerSides(childInput, nextElevations), calculationContext);
+    nextElevations = uniqueById([...nextElevations.filter((item) => item.id !== childElevation.id), nextChildElevation]);
+    const nextParentElevation = calculateElevation(withEffectiveCornerSides(nextParentInput, nextElevations), calculationContext);
+    nextElevations = uniqueById([...nextElevations.filter((item) => item.id !== parentElevation.id), nextParentElevation]);
+
+    setSavedElevations(nextElevations);
+    if (input.id === parentElevation.id) {
+      setInput(nextParentInput);
+    }
+    setPlanJoinMode(false);
+    setStatus(`Joined ${getElevationPlanLabel(jobElevations, parentElevation.id)} to ${getElevationPlanLabel(jobElevations, childElevation.id)}`);
+    repository.saveElevation(nextParentElevation).catch(() => setStatus("Joined elevations in memory until local storage is available"));
+    repository.saveElevation(nextChildElevation).catch(() => setStatus("Joined elevations in memory until local storage is available"));
+    return true;
+  };
+
+  const selectAdjacentElevation = (direction: -1 | 1) => {
+    if (jobElevations.length <= 1) return;
+    const currentIndex = jobElevations.findIndex((item) => item.id === input.id);
+    if (currentIndex < 0) return;
+    const nextIndex = (currentIndex + direction + jobElevations.length) % jobElevations.length;
+    loadJobElevation(jobElevations[nextIndex].id);
+    setPreviewMode("elevation");
+  };
+
   const archiveCurrentJob = () => {
     saveJobState({ ...job, status: "archived", archivedAt: new Date().toISOString() }, "Archived current job");
     setJobSetupMode("existing");
@@ -638,24 +722,19 @@ export function App() {
   };
 
   const updateKneeWall = (columnIndex: number, height: number | null) => {
-    setInput((current) => {
-      const normalizedWalls = normalizeKneeWallConfigs(current.kneeWalls, current.columns);
-      const nextWalls =
-        height === null
-          ? normalizedWalls.filter((wall) => wall.columnIndex !== columnIndex)
-          : uniqueKneeWalls([
-              ...normalizedWalls.filter((wall) => wall.columnIndex !== columnIndex),
-              { columnIndex, height }
-            ]);
-
-      return normalizeLayoutSizingInput({
-        ...current,
-        kneeWalls: nextWalls
-      });
-    });
+    const nextInput = createKneeWallUpdatedInput(input, columnIndex, height);
+    const { savedElevations: nextSavedElevations } = syncConnectedCornerKneeWalls(
+      nextInput,
+      savedElevations,
+      calculationContext
+    );
+    setInput(nextInput);
+    if (nextSavedElevations !== savedElevations) {
+      setSavedElevations(nextSavedElevations);
+    }
   };
 
-  const updateLiteSplit = (lite: Lite, count: number | null) => {
+  const updateLiteSplit = (lite: Lite, count: number | null, orientation: LiteSplitOrientation = "vertical") => {
     setInput((current) => {
       const normalizedSplits = normalizeLiteSplitConfigs(current.liteSplits, current.rows, current.columns);
       const nextSplits =
@@ -666,7 +745,7 @@ export function App() {
               {
                 rowIndex: lite.rowIndex,
                 columnIndex: lite.columnIndex,
-                orientation: "vertical",
+                orientation,
                 count
               }
             ]);
@@ -913,6 +992,11 @@ export function App() {
             selectedAssemblyMark={selectedAssemblyMark}
             onSelectAssembly={selectAssembly}
             onSelectElevation={selectElevationFromPlan}
+            onSelectAdjacentElevation={selectAdjacentElevation}
+            planJoinMode={planJoinMode}
+            planJoinSelection={planJoinSelection}
+            onTogglePlanJoinMode={togglePlanJoinMode}
+            onSelectPlanJoinElevation={selectPlanJoinElevation}
           />
         </aside>
       </section>
@@ -1139,7 +1223,7 @@ function LayoutStep({
   updateSizingMode: (axis: LayoutAxis, mode: LayoutSizingMode) => void;
   updateCustomSize: (axis: LayoutAxis, index: number, value: number | null) => void;
   updateKneeWall: (columnIndex: number, height: number | null) => void;
-  updateLiteSplit: (lite: Lite, count: number | null) => void;
+  updateLiteSplit: (lite: Lite, count: number | null, orientation?: LiteSplitOrientation) => void;
   updateDoor: (patch: Partial<DoorConfig>) => void;
   updateCorner: (patch: Partial<CornerConfig>) => void;
   onShowFloorPlan: () => void;
@@ -1231,11 +1315,13 @@ function LayoutStep({
           {liteSplitState.existingSplit ? (
             <>
               <NumberField
-                label="Vertical lites"
+                label={`${titleCase(liteSplitState.existingSplit.orientation)} lites`}
                 value={liteSplitState.existingSplit.count}
                 kind="count"
                 min={2}
-                onChange={(value) => updateLiteSplit(selectedLite, Math.max(2, Math.min(value, 4)))}
+                onChange={(value) =>
+                  updateLiteSplit(selectedLite, Math.max(2, Math.min(value, 4)), liteSplitState.existingSplit?.orientation)
+                }
               />
               <button
                 type="button"
@@ -1246,13 +1332,22 @@ function LayoutStep({
               </button>
             </>
           ) : (
-            <button
-              type="button"
-              className="secondary-button wide"
-              onClick={() => updateLiteSplit(selectedLite, 2)}
-            >
-              Split {selectedLite.mark} vertically
-            </button>
+            <div className="split-action-row">
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => updateLiteSplit(selectedLite, 2, "vertical")}
+              >
+                Split vertically
+              </button>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => updateLiteSplit(selectedLite, 2, "horizontal")}
+              >
+                Split horizontally
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -1653,7 +1748,12 @@ function ElevationPreview({
   showAssemblyNumbers,
   selectedAssemblyMark,
   onSelectAssembly,
-  onSelectElevation
+  onSelectElevation,
+  onSelectAdjacentElevation,
+  planJoinMode,
+  planJoinSelection,
+  onTogglePlanJoinMode,
+  onSelectPlanJoinElevation
 }: {
   elevation: Elevation;
   jobElevations: Elevation[];
@@ -1664,14 +1764,30 @@ function ElevationPreview({
   selectedAssemblyMark: string | null;
   onSelectAssembly: (mark: string, type: SelectionTargetType) => void;
   onSelectElevation: (elevationId: string) => void;
+  onSelectAdjacentElevation: (direction: -1 | 1) => void;
+  planJoinMode: boolean;
+  planJoinSelection: string[];
+  onTogglePlanJoinMode: () => void;
+  onSelectPlanJoinElevation: (elevationId: string) => void;
 }) {
   if (previewMode === "plan" && cornerPlan) {
-    return <CornerPlanPreview plan={cornerPlan} onSelectElevation={onSelectElevation} onPreviewModeChange={onPreviewModeChange} />;
+    return (
+      <CornerPlanPreview
+        plan={cornerPlan}
+        joinMode={planJoinMode}
+        joinSelection={planJoinSelection}
+        onSelectElevation={onSelectElevation}
+        onPreviewModeChange={onPreviewModeChange}
+        onToggleJoinMode={onTogglePlanJoinMode}
+        onSelectJoinElevation={onSelectPlanJoinElevation}
+      />
+    );
   }
 
   const geometry = elevation.computedGeometry;
   const viewBox = `-6 -16 ${Math.max(geometry.frameWidth + 12, 1)} ${Math.max(geometry.frameHeight + 22, 1)}`;
   const doorGlassCallouts = getDoorGlassCalloutMap(elevation.computedGlass.items);
+  const kneeWallRuns = getKneeWallRuns(geometry.kneeWalls);
   const visibleAssemblyCallouts = geometry.assemblyCallouts.filter((callout) => shouldShowAssemblyCallout(callout, showAssemblyNumbers));
   const mainAssemblyRegions = getMainAssemblyRegions(elevation);
   const liteRegions = getLiteSelectionRegions(elevation);
@@ -1692,7 +1808,27 @@ function ElevationPreview({
     <section className="drawing-preview">
       <div className="preview-header">
         <strong>Elevation Preview</strong>
-        <span className="preview-elevation-label">Elevation {elevationLabel}</span>
+        <div className="preview-elevation-control" aria-label="Elevation navigation">
+          <button
+            type="button"
+            className="preview-nav-button"
+            aria-label="Previous elevation"
+            disabled={jobElevations.length <= 1}
+            onClick={() => onSelectAdjacentElevation(-1)}
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <span className="preview-elevation-label">Elevation {elevationLabel}</span>
+          <button
+            type="button"
+            className="preview-nav-button"
+            aria-label="Next elevation"
+            disabled={jobElevations.length <= 1}
+            onClick={() => onSelectAdjacentElevation(1)}
+          >
+            <ChevronRight size={16} />
+          </button>
+        </div>
         <div className="preview-header-actions">
           {cornerPlan && (
             <div className="preview-toggle" aria-label="Preview mode">
@@ -1704,7 +1840,7 @@ function ElevationPreview({
       </div>
       <svg viewBox={viewBox} role="img" aria-label="Computed storefront elevation">
         <rect x="0" y="0" width={geometry.frameWidth} height={geometry.frameHeight} className="svg-frame" />
-        {geometry.kneeWalls.map((kneeWall) => (
+        {kneeWallRuns.map((kneeWall) => (
           <rect
             key={kneeWall.id}
             x={kneeWall.x}
@@ -1825,11 +1961,11 @@ function ElevationPreview({
             </text>
           );
         })}
-        {geometry.kneeWalls.map((kneeWall) => (
+        {kneeWallRuns.map((kneeWall) => (
           <text
             key={`${kneeWall.id}-label`}
             x={kneeWall.x + kneeWall.width / 2}
-            y={geometry.frameHeight - kneeWall.height / 2}
+            y={geometry.frameHeight - kneeWall.y - kneeWall.height / 2}
             className="svg-knee-wall-label"
             textAnchor="middle"
           >
@@ -1912,12 +2048,20 @@ function ElevationPreview({
 
 function CornerPlanPreview({
   plan,
+  joinMode,
+  joinSelection,
   onSelectElevation,
-  onPreviewModeChange
+  onPreviewModeChange,
+  onToggleJoinMode,
+  onSelectJoinElevation
 }: {
   plan: CornerPlanContext;
+  joinMode: boolean;
+  joinSelection: string[];
   onSelectElevation: (elevationId: string) => void;
   onPreviewModeChange: (mode: PreviewMode) => void;
+  onToggleJoinMode: () => void;
+  onSelectJoinElevation: (elevationId: string) => void;
 }) {
   const profileWidth = Math.max(plan.cornerSightline, 2);
   const padding = Math.max(profileWidth * 4, 18);
@@ -1936,17 +2080,42 @@ function CornerPlanPreview({
           {plan.segments.length} elevation{plan.segments.length === 1 ? "" : "s"}
         </span>
         <div className="preview-header-actions">
+          <button
+            type="button"
+            className={`preview-action-button ${joinMode ? "selected" : ""}`}
+            onClick={onToggleJoinMode}
+          >
+            {joinMode ? "Cancel" : "Join"}
+          </button>
           <div className="preview-toggle" aria-label="Preview mode">
             <button type="button" onClick={() => onPreviewModeChange("elevation")}>Elevation</button>
             <button type="button" className="selected" onClick={() => onPreviewModeChange("plan")}>Plan</button>
           </div>
         </div>
       </div>
+      {joinMode && (
+        <div className="plan-join-note">
+          Select two adjacent elevations to restore the corner connection.
+        </div>
+      )}
       <svg viewBox={`${minX} ${minY} ${Math.max(maxX - minX, 1)} ${Math.max(maxY - minY, 1)}`} role="img" aria-label="Job floor plan selector">
         {plan.segments.map((segment) => {
           const active = plan.activeElevationId === segment.elevation.id;
+          const joinSelected = joinSelection.includes(segment.elevation.id);
           const midX = (segment.x1 + segment.x2) / 2;
           const midY = (segment.y1 + segment.y2) / 2;
+          const hitPad = Math.max(profileWidth * 2.5, 8);
+          const hitX = Math.min(segment.x1, segment.x2) - hitPad;
+          const hitY = Math.min(segment.y1, segment.y2) - hitPad;
+          const hitWidth = Math.max(Math.abs(segment.x2 - segment.x1), 1) + hitPad * 2;
+          const hitHeight = Math.max(Math.abs(segment.y2 - segment.y1), 1) + hitPad * 2;
+          const handleSelect = () => {
+            if (joinMode) {
+              onSelectJoinElevation(segment.elevation.id);
+              return;
+            }
+            onSelectElevation(segment.elevation.id);
+          };
           return (
             <g key={segment.elevation.id}>
               <line
@@ -1954,20 +2123,20 @@ function CornerPlanPreview({
                 y1={segment.y1}
                 x2={segment.x2}
                 y2={segment.y2}
-                className={`svg-plan-leg ${active ? "selected" : ""}`}
+                className={`svg-plan-leg ${active ? "selected" : ""} ${joinSelected ? "join-selected" : ""}`}
               />
-              <line
-                x1={segment.x1}
-                y1={segment.y1}
-                x2={segment.x2}
-                y2={segment.y2}
-                className="svg-plan-hit-area-line"
+              <rect
+                x={hitX}
+                y={hitY}
+                width={hitWidth}
+                height={hitHeight}
+                className="svg-plan-hit-area"
                 role="button"
                 tabIndex={0}
-                aria-label={`Edit ${segment.elevation.name}`}
-                onClick={() => onSelectElevation(segment.elevation.id)}
+                aria-label={joinMode ? `Join ${segment.label}` : `Edit ${segment.elevation.name}`}
+                onClick={handleSelect}
                 onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") onSelectElevation(segment.elevation.id);
+                  if (event.key === "Enter" || event.key === " ") handleSelect();
                 }}
               />
               <text x={midX} y={midY - profileWidth * 1.6} className="svg-plan-label" textAnchor="middle">
@@ -2663,7 +2832,7 @@ function getJobPlanContext(
     const corner = normalizeCornerConfig(elevation.cornerConfig);
     const nextElevation = elevations[index + 1];
 
-    if (corner.hasCorner && nextElevation) {
+    if (corner.hasCorner && nextElevation && corner.linkedElevationId === nextElevation.id) {
       const pivot = corner.side === "right" ? end : start;
       corners.push(pivot);
       direction = rotatePlanDirection(direction, corner.condition === "outside" ? "counterclockwise" : "clockwise");
@@ -2727,8 +2896,10 @@ function getKneeWallControlState(
   const doorColumns = getDoorColumnIndexes(input);
   const assemblyMark = `A${selectedColumnIndex + 1}`;
   const isDoorColumn = doorColumns.has(selectedColumnIndex);
-  const defaultHeight = getDefaultKneeWallHeight(elevation);
+  const defaultHeight = getAdjacentKneeWallHeight(walls, selectedColumnIndex) ?? getDefaultKneeWallHeight(elevation);
   const canAdd = !isDoorColumn && isKneeWallColumnEligible(selectedColumnIndex, input.columns, walls);
+  const runColumns = existingWall ? getKneeWallUpdateColumns(walls, input.columns, selectedColumnIndex) : new Set([selectedColumnIndex]);
+  const runLabel = formatKneeWallAssemblyLabel(runColumns);
   const reason = isDoorColumn
     ? "Knee-walls are not available in a door bay."
     : "Start from the left-most or right-most assembly, then grow knee-walls inward one assembly at a time.";
@@ -2739,14 +2910,97 @@ function getKneeWallControlState(
     columnIndex: selectedColumnIndex,
     defaultHeight,
     description: existingWall
-      ? `This knee-wall spans the full width of ${assemblyMark}.`
+      ? `This knee-wall runs continuously across ${runLabel}.`
       : canAdd
         ? `Default height is one-third of the bottom row: ${formatInches(defaultHeight)}.`
         : `Select an outside assembly first to unlock ${assemblyMark}.`,
     existingWall,
     reason,
-    title: `Knee-wall ${assemblyMark}`
+    title: `Knee-wall ${existingWall ? runLabel : assemblyMark}`
   };
+}
+
+function getKneeWallUpdateColumns(walls: KneeWallConfig[], columns: number, columnIndex: number): Set<number> {
+  const wallColumns = new Set(walls.map((wall) => wall.columnIndex));
+  const runColumns = new Set<number>([clampIndex(columnIndex, columns)]);
+
+  for (let left = columnIndex - 1; left >= 0 && wallColumns.has(left); left -= 1) {
+    runColumns.add(left);
+  }
+  for (let right = columnIndex + 1; right < columns && wallColumns.has(right); right += 1) {
+    runColumns.add(right);
+  }
+
+  return runColumns;
+}
+
+function createKneeWallUpdatedInput(input: ElevationInput, columnIndex: number, height: number | null): ElevationInput {
+  const normalizedWalls = normalizeKneeWallConfigs(input.kneeWalls, input.columns);
+  const runColumns = getKneeWallUpdateColumns(normalizedWalls, input.columns, columnIndex);
+  const nextWalls =
+    height === null
+      ? normalizedWalls.filter((wall) => wall.columnIndex !== columnIndex)
+      : uniqueKneeWalls([
+          ...normalizedWalls.filter((wall) => !runColumns.has(wall.columnIndex)),
+          ...Array.from(runColumns).map((runColumnIndex) => ({ columnIndex: runColumnIndex, height }))
+        ]);
+
+  return normalizeLayoutSizingInput({
+    ...input,
+    kneeWalls: nextWalls
+  });
+}
+
+function syncConnectedCornerKneeWalls(
+  activeInput: ElevationInput,
+  savedElevations: Elevation[],
+  calculationContext: CalculationContext
+): { activeInput: ElevationInput; savedElevations: Elevation[] } {
+  let nextSavedElevations = savedElevations;
+  const activeWalls = normalizeKneeWallConfigs(activeInput.kneeWalls, activeInput.columns);
+
+  const syncSide = (activeSide: CornerSide, targetElevationId: string | undefined, targetSide: CornerSide) => {
+    if (!targetElevationId) return;
+    const targetElevation = nextSavedElevations.find((item) => item.id === targetElevationId);
+    if (!targetElevation) return;
+    const activeColumnIndex = getSideColumnIndex(activeSide, activeInput.columns);
+    const activeWall = activeWalls.find((wall) => wall.columnIndex === activeColumnIndex);
+    const targetInput = toInput(targetElevation);
+    const targetColumnIndex = getSideColumnIndex(targetSide, targetInput.columns);
+    const nextTargetInput = createKneeWallUpdatedInput(targetInput, targetColumnIndex, activeWall?.height ?? null);
+    const calculatedTarget = calculateElevation(withEffectiveCornerSides(nextTargetInput, nextSavedElevations), calculationContext);
+    nextSavedElevations = uniqueById([...nextSavedElevations.filter((item) => item.id !== calculatedTarget.id), calculatedTarget]);
+  };
+
+  const outgoingCorner = normalizeCornerConfig(activeInput.cornerConfig);
+  if (outgoingCorner.hasCorner) {
+    syncSide(outgoingCorner.side, outgoingCorner.linkedElevationId, oppositeCornerSide(outgoingCorner.side));
+  }
+
+  const incomingParent = getIncomingCornerParent(activeInput.id, nextSavedElevations);
+  if (incomingParent) {
+    const parentSide = normalizeCornerConfig(incomingParent.cornerConfig).side;
+    syncSide(oppositeCornerSide(parentSide), incomingParent.id, parentSide);
+  }
+
+  return { activeInput, savedElevations: nextSavedElevations };
+}
+
+function getSideColumnIndex(side: CornerSide, columns: number): number {
+  return side === "left" ? 0 : Math.max(columns - 1, 0);
+}
+
+function getAdjacentKneeWallHeight(walls: KneeWallConfig[], columnIndex: number): number | null {
+  const leftWall = walls.find((wall) => wall.columnIndex === columnIndex - 1);
+  const rightWall = walls.find((wall) => wall.columnIndex === columnIndex + 1);
+  return leftWall?.height ?? rightWall?.height ?? null;
+}
+
+function formatKneeWallAssemblyLabel(columns: Set<number>): string {
+  const sortedColumns = Array.from(columns).sort((left, right) => left - right);
+  if (sortedColumns.length === 0) return "A1";
+  if (sortedColumns.length === 1) return `A${sortedColumns[0] + 1}`;
+  return `A${sortedColumns[0] + 1}-A${sortedColumns[sortedColumns.length - 1] + 1}`;
 }
 
 function getLiteSplitControlState(
@@ -2766,8 +3020,10 @@ function getLiteSplitControlState(
 
   return {
     description: existingSplit
-      ? `${lite.mark} is split into ${existingSplit.count} vertical lites. The added vertical runs from the raised sill/top of sill to the next horizontal.`
-      : `Split ${lite.mark} within A${lite.columnIndex + 1} without changing the row above or below.`,
+      ? existingSplit.orientation === "horizontal"
+        ? `${lite.mark} is split into ${existingSplit.count} stacked lites. The added horizontal stays inside this lite.`
+        : `${lite.mark} is split into ${existingSplit.count} vertical lites. The added vertical runs from sill to the next horizontal.`
+      : `Split ${lite.mark} within A${lite.columnIndex + 1} without changing the surrounding rows or columns.`,
     existingSplit,
     title: `Lite ${lite.mark}`
   };
@@ -2838,10 +3094,11 @@ function uniqueLiteSplits(splits: LiteSplitConfig[]): LiteSplitConfig[] {
 
 function buildCornerReturnKneeWalls(source: ElevationInput, sourceCornerSide: CornerSide): KneeWallConfig[] {
   const sourceColumnIndex = sourceCornerSide === "right" ? source.columns - 1 : 0;
+  const returnColumnIndex = sourceCornerSide === "right" ? 0 : Math.max(source.columns - 1, 0);
   const sourceWall = normalizeKneeWallConfigs(source.kneeWalls, source.columns).find(
     (wall) => wall.columnIndex === sourceColumnIndex
   );
-  return sourceWall ? [{ columnIndex: 0, height: sourceWall.height }] : [];
+  return sourceWall ? [{ columnIndex: returnColumnIndex, height: sourceWall.height }] : [];
 }
 
 function rotatePlanDirection(

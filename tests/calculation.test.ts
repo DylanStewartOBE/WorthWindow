@@ -257,6 +257,31 @@ describe("FG-2000 calculation engine", () => {
     });
   });
 
+  it("stops intermediate mullions at the top of a continuous knee-wall run", () => {
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        columns: 3,
+        kneeWalls: [
+          { columnIndex: 0, height: 16 },
+          { columnIndex: 1, height: 16 }
+        ]
+      },
+      context
+    );
+    const mullionBetweenKneeWalls = elevation.computedGeometry.members.find((member) => member.id === "member-v-1");
+    const mullionAfterKneeWallRun = elevation.computedGeometry.members.find((member) => member.id === "member-v-2");
+
+    expect(mullionBetweenKneeWalls).toMatchObject({
+      y: 16,
+      height: 79.375
+    });
+    expect(mullionAfterKneeWallRun).toMatchObject({
+      y: 0,
+      height: 95.375
+    });
+  });
+
   it("can split a selected bottom-row lite vertically without changing the top row", () => {
     const elevation = calculateElevation(
       {
@@ -287,6 +312,44 @@ describe("FG-2000 calculation engine", () => {
     expect(elevation.computedGlass.items.find((item) => item.mark === "G2")).toMatchObject({
       qty: 2,
       width: 22.5,
+      location: "R1C2, R1C2"
+    });
+  });
+
+  it("can split a selected lite horizontally without moving adjacent row lines", () => {
+    const baseline = calculateElevation({ ...noDoorSeedInput, columns: 3 }, context);
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        columns: 3,
+        liteSplits: [{ rowIndex: 0, columnIndex: 1, orientation: "horizontal", count: 2 }]
+      },
+      context
+    );
+    const bottomA2Lites = elevation.computedGeometry.lites.filter(
+      (lite) => lite.rowIndex === 0 && lite.columnIndex === 1
+    );
+    const topA2Lites = elevation.computedGeometry.lites.filter(
+      (lite) => lite.rowIndex === 1 && lite.columnIndex === 1
+    );
+    const baselineTopA2Lite = baseline.computedGeometry.lites.find((lite) => lite.rowIndex === 1 && lite.columnIndex === 1);
+    const splitMember = elevation.computedGeometry.members.find((member) => member.id === "member-lite-split-h-r1-c2-1");
+
+    expect(bottomA2Lites).toHaveLength(2);
+    expect(new Set(bottomA2Lites.map((lite) => lite.glassWidth))).toEqual(new Set([46.0625]));
+    expect(new Set(bottomA2Lites.map((lite) => lite.glassHeight))).toEqual(new Set([22.3125]));
+    expect(topA2Lites).toHaveLength(1);
+    expect(topA2Lites[0].height).toBeCloseTo(baselineTopA2Lite?.height ?? 0);
+    expect(splitMember).toMatchObject({
+      role: "horizontal-mullion",
+      x: 48.958,
+      y: 23.407,
+      width: 45.458,
+      height: 1.75
+    });
+    expect(elevation.computedGlass.items.find((item) => item.mark === "G2")).toMatchObject({
+      qty: 2,
+      height: 22.3125,
       location: "R1C2, R1C2"
     });
   });

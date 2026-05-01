@@ -1913,18 +1913,23 @@ function buildNotes(
   entranceRules: EntranceRulePack | undefined,
   noteLibrary: NoteLibrary
 ): string[] {
+  const hasEntrance = Boolean(entranceRules && input.doorConfig.hasDoor && input.doorConfig.doorType !== "none");
   const notes = [
     ...storefrontRules.notes,
-    ...(entranceRules?.notes ?? []),
+    ...(hasEntrance ? entranceRules?.notes ?? [] : []),
     noteLibrary.finish[input.finishConfig.finishId],
     noteLibrary.glass[input.glassConfig.glassTypeId],
     input.cornerConfig.hasCorner
       ? `Corner condition: ${input.cornerConfig.condition ?? "outside"} ${input.cornerConfig.side} return with corner mullion sightline assumed at ${getCornerMullionSightline(storefrontRules)} in.`
       : undefined,
-    input.doorConfig.swing ? noteLibrary.hardware[input.doorConfig.swing] : undefined,
-    input.doorConfig.hingeType ? noteLibrary.hardware[input.doorConfig.hingeType] : undefined,
-    ...input.doorConfig.hardwareNoteIds.map((id) => noteLibrary.hardware[id]),
-    input.doorConfig.thresholdNoteId ? noteLibrary.threshold[input.doorConfig.thresholdNoteId] : undefined
+    ...(hasEntrance
+      ? [
+          input.doorConfig.swing ? noteLibrary.hardware[input.doorConfig.swing] : undefined,
+          input.doorConfig.hingeType ? noteLibrary.hardware[input.doorConfig.hingeType] : undefined,
+          ...input.doorConfig.hardwareNoteIds.map((id) => noteLibrary.hardware[id]),
+          input.doorConfig.thresholdNoteId ? noteLibrary.threshold[input.doorConfig.thresholdNoteId] : undefined
+        ]
+      : [])
   ];
 
   return Array.from(new Set(notes.filter((note): note is string => Boolean(note))));

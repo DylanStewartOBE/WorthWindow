@@ -391,6 +391,33 @@ describe("FG-2000 calculation engine", () => {
     expect(elevation.computedGeometry.bays[0].width).toBeCloseTo(71.688);
   });
 
+  it("omits entrance, swing, hinge, hardware, and threshold notes for no-door elevations", () => {
+    const elevation = calculateElevation(noDoorSeedInput, context);
+    const noteText = elevation.computedGeometry.notes.join("\n");
+
+    expect(noteText).not.toContain("Standard entrance package");
+    expect(noteText).not.toContain("Door swing:");
+    expect(noteText).not.toContain("Hinge:");
+    expect(noteText).not.toContain("Hardware note:");
+    expect(noteText).not.toContain("Threshold / transition:");
+  });
+
+  it("keeps selected entrance notes for door elevations", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+
+    expect(elevation.computedGeometry.notes).toEqual(
+      expect.arrayContaining([
+        "Standard entrance package is note-level only in V1; verify final entrance fabrication details with approved entrance documents.",
+        "Door swing: outswing.",
+        "Hinge: continuous gear hinge.",
+        "Hardware note: rim panic device.",
+        "Hardware note: closer required; surface or concealed as selected in final hardware set.",
+        "Hardware note: pull / push set.",
+        "Threshold / transition: standard accessible threshold, verify floor condition."
+      ])
+    );
+  });
+
   it("adds a corner note when a return is configured", () => {
     const elevation = calculateElevation(
       {

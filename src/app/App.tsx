@@ -1,11 +1,13 @@
 import {
   AlertTriangle,
+  Bath,
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
   Copy,
   DoorOpen,
+  Droplets,
   Eye,
   EyeOff,
   FileDown,
@@ -16,7 +18,8 @@ import {
   Settings,
   Share2,
   SlidersHorizontal,
-  Trash2
+  Trash2,
+  Wine
 } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import {
@@ -88,6 +91,7 @@ type ConfigState = {
 
 type LayoutAxis = "row" | "column";
 type JobSetupMode = "new" | "existing";
+type ProductMode = "landing" | "window-wall" | "cabinets" | "plumbing" | "wine-room" | "bathroom";
 
 type CustomSizingFieldState = {
   disabled: boolean;
@@ -150,6 +154,53 @@ const defaultCornerConfig: CornerConfig = {
 };
 
 export function App() {
+  const [productMode, setProductMode] = useState<ProductMode>("landing");
+
+  if (productMode === "window-wall") {
+    return <WindowWallApp onBackToProducts={() => setProductMode("landing")} />;
+  }
+
+  if (productMode === "cabinets") {
+    return <CabinetQuoteApp onBackToProducts={() => setProductMode("landing")} />;
+  }
+
+  if (productMode === "plumbing") {
+    return (
+      <TradeWorkspaceApp
+        eyebrow="Plumbing quoting"
+        title="Plumbing"
+        summary="Fixture counts, rough-in notes, allowances, and quote outputs will live in a plumbing-specific engine."
+        onBackToProducts={() => setProductMode("landing")}
+      />
+    );
+  }
+
+  if (productMode === "wine-room") {
+    return (
+      <TradeWorkspaceApp
+        eyebrow="Wine room quoting"
+        title="Wine Room"
+        summary="Racking, glass, climate notes, finishes, and quote outputs will live in a wine-room-specific engine."
+        onBackToProducts={() => setProductMode("landing")}
+      />
+    );
+  }
+
+  if (productMode === "bathroom") {
+    return (
+      <TradeWorkspaceApp
+        eyebrow="Bathroom quoting"
+        title="Bathroom"
+        summary="Vanities, fixtures, shower scopes, accessories, and quote outputs will live in a bathroom-specific engine."
+        onBackToProducts={() => setProductMode("landing")}
+      />
+    );
+  }
+
+  return <ProductLanding onSelectProduct={setProductMode} />;
+}
+
+function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
   const [activeStep, setActiveStep] = useState(0);
   const [job, setJob] = useState<Job>(seedJob);
   const [input, setInput] = useState<ElevationInput>(pairDoorSeedInput);
@@ -873,6 +924,10 @@ export function App() {
             alt={config.branding.companyName}
           />
         </a>
+        <button type="button" className="product-switch-button" onClick={onBackToProducts}>
+          <ChevronLeft size={15} />
+          <span>Products</span>
+        </button>
         <nav className="stepper" ref={stepperRef} aria-label="Wizard steps">
           {steps.map((step, index) => {
             const Icon = step.icon;
@@ -1013,6 +1068,252 @@ export function App() {
       </footer>
 
       {adminOpen && <AdminPanel config={config} setConfig={setConfig} onClose={() => setAdminOpen(false)} />}
+    </main>
+  );
+}
+
+function ProductLanding({ onSelectProduct }: { onSelectProduct: (mode: ProductMode) => void }) {
+  return (
+    <main className="product-landing-shell">
+      <header className="landing-header">
+        <a
+          className="landing-brand"
+          href="https://www.worthcon.com"
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`${defaultBranding.companyName} website`}
+        >
+          <img className="landing-logo-full" src={defaultBranding.logoPath ?? "/brand/worthcon.svg"} alt={defaultBranding.companyName} />
+          <img className="landing-logo-mark" src={defaultBranding.logoMarkPath ?? "/brand/worthcon-w.svg"} alt={defaultBranding.companyName} />
+        </a>
+        <div>
+          <p className="eyebrow">Field tools</p>
+          <h1>Worth Construction</h1>
+        </div>
+      </header>
+
+      <section className="product-picker" aria-labelledby="product-picker-title">
+        <div className="section-title">
+          <h2 id="product-picker-title">Choose a workspace</h2>
+          <p>Start with the trade you are quoting or drawing today.</p>
+        </div>
+
+        <div className="product-choice-grid">
+          <button type="button" className="product-choice-card window-wall" onClick={() => onSelectProduct("window-wall")}>
+            <span className="product-choice-icon"><LayoutGrid size={24} /></span>
+            <span>
+              <strong>Window / Wall Systems</strong>
+              <small>Storefront elevations, glass take-offs, metal take-offs, quotes, and drawing packages.</small>
+            </span>
+            <ChevronRight size={20} />
+          </button>
+
+          <button type="button" className="product-choice-card cabinets" onClick={() => onSelectProduct("cabinets")}>
+            <span className="product-choice-icon"><SlidersHorizontal size={24} /></span>
+            <span>
+              <strong>Cabinets</strong>
+              <small>A separate cabinet quoting workspace ready for its own rules, products, and outputs.</small>
+            </span>
+            <ChevronRight size={20} />
+          </button>
+
+          <button type="button" className="product-choice-card plumbing" onClick={() => onSelectProduct("plumbing")}>
+            <span className="product-choice-icon"><Droplets size={24} /></span>
+            <span>
+              <strong>Plumbing</strong>
+              <small>Fixture counts, rough-in notes, allowances, and quote outputs in their own workspace.</small>
+            </span>
+            <ChevronRight size={20} />
+          </button>
+
+          <button type="button" className="product-choice-card wine-room" onClick={() => onSelectProduct("wine-room")}>
+            <span className="product-choice-icon"><Wine size={24} /></span>
+            <span>
+              <strong>Wine Room</strong>
+              <small>Racking, climate notes, glass, finishes, and quote outputs for specialty rooms.</small>
+            </span>
+            <ChevronRight size={20} />
+          </button>
+
+          <button type="button" className="product-choice-card bathroom" onClick={() => onSelectProduct("bathroom")}>
+            <span className="product-choice-icon"><Bath size={24} /></span>
+            <span>
+              <strong>Bathroom</strong>
+              <small>Vanities, fixture groups, shower scopes, accessories, and bathroom quote packages.</small>
+            </span>
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function CabinetQuoteApp({ onBackToProducts }: { onBackToProducts: () => void }) {
+  const [quoteName, setQuoteName] = useState("Cabinet quote");
+  const [customer, setCustomer] = useState("");
+  const [room, setRoom] = useState("Kitchen");
+  const [baseLinearFeet, setBaseLinearFeet] = useState(0);
+  const [wallLinearFeet, setWallLinearFeet] = useState(0);
+  const [tallLinearFeet, setTallLinearFeet] = useState(0);
+  const totalLinearFeet = baseLinearFeet + wallLinearFeet + tallLinearFeet;
+
+  return (
+    <main className="cabinet-shell">
+      <header className="cabinet-topbar">
+        <a
+          className="brand-lockup"
+          href="https://www.worthcon.com"
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`${defaultBranding.companyName} website`}
+        >
+          <img className="brand-logo-full" src={defaultBranding.logoPath ?? "/brand/worthcon.svg"} alt={defaultBranding.companyName} />
+          <img className="brand-logo-mark" src={defaultBranding.logoMarkPath ?? "/brand/worthcon-w.svg"} alt={defaultBranding.companyName} />
+        </a>
+        <button type="button" className="product-switch-button" onClick={onBackToProducts}>
+          <ChevronLeft size={15} />
+          <span>Products</span>
+        </button>
+        <div className="cabinet-title">
+          <p className="eyebrow">Cabinet quoting</p>
+          <h1>{quoteName}</h1>
+        </div>
+      </header>
+
+      <section className="cabinet-workspace">
+        <div className="cabinet-editor">
+          <section className="step-content">
+            <SectionTitle title="Job Setup" subtitle="Cabinet quotes live separately from window and wall systems" />
+            <div className="field-grid compact">
+              <TextField label="Quote name" value={quoteName} onChange={setQuoteName} />
+              <TextField label="Customer" value={customer} onChange={setCustomer} />
+              <TextField label="Room / area" value={room} onChange={setRoom} />
+            </div>
+          </section>
+
+          <section className="step-content">
+            <SectionTitle title="Cabinet Runs" subtitle="Linear footage capture for the first cabinet quoting pass" />
+            <div className="field-grid compact">
+              <NumberField label="Base cabinets ln ft" value={baseLinearFeet} onChange={setBaseLinearFeet} />
+              <NumberField label="Wall cabinets ln ft" value={wallLinearFeet} onChange={setWallLinearFeet} />
+              <NumberField label="Tall cabinets ln ft" value={tallLinearFeet} onChange={setTallLinearFeet} />
+            </div>
+          </section>
+        </div>
+
+        <aside className="cabinet-summary">
+          <section className="drawing-preview">
+            <div className="section-title">
+              <h2>Quote Summary</h2>
+              <p>Rules and pricing will be cabinet-specific, not shared with storefront.</p>
+            </div>
+            <div className="metric-grid">
+              <div className="metric">
+                <span>Customer</span>
+                <strong>{customer || "Not set"}</strong>
+              </div>
+              <div className="metric">
+                <span>Room</span>
+                <strong>{room || "Not set"}</strong>
+              </div>
+              <div className="metric">
+                <span>Total ln ft</span>
+                <strong>{totalLinearFeet.toFixed(2)}</strong>
+              </div>
+              <div className="metric">
+                <span>Status</span>
+                <strong>Draft</strong>
+              </div>
+            </div>
+            <div className="result-band stacked">
+              <strong>Cabinet engine boundary</strong>
+              <span>This workspace is ready for cabinet-only rules, persistence, quote PDFs, and product catalogs.</span>
+            </div>
+          </section>
+        </aside>
+      </section>
+    </main>
+  );
+}
+
+function TradeWorkspaceApp({
+  eyebrow,
+  title,
+  summary,
+  onBackToProducts
+}: {
+  eyebrow: string;
+  title: string;
+  summary: string;
+  onBackToProducts: () => void;
+}) {
+  const [quoteName, setQuoteName] = useState(`${title} quote`);
+  const [customer, setCustomer] = useState("");
+  const [area, setArea] = useState("");
+
+  return (
+    <main className="cabinet-shell">
+      <header className="cabinet-topbar">
+        <a
+          className="brand-lockup"
+          href="https://www.worthcon.com"
+          target="_blank"
+          rel="noreferrer"
+          aria-label={`${defaultBranding.companyName} website`}
+        >
+          <img className="brand-logo-full" src={defaultBranding.logoPath ?? "/brand/worthcon.svg"} alt={defaultBranding.companyName} />
+          <img className="brand-logo-mark" src={defaultBranding.logoMarkPath ?? "/brand/worthcon-w.svg"} alt={defaultBranding.companyName} />
+        </a>
+        <button type="button" className="product-switch-button" onClick={onBackToProducts}>
+          <ChevronLeft size={15} />
+          <span>Products</span>
+        </button>
+        <div className="cabinet-title">
+          <p className="eyebrow">{eyebrow}</p>
+          <h1>{title}</h1>
+        </div>
+      </header>
+
+      <section className="cabinet-workspace">
+        <div className="cabinet-editor">
+          <section className="step-content">
+            <SectionTitle title={`${title} Setup`} subtitle="This workspace is reserved for its own rule set and quote logic" />
+            <div className="field-grid compact">
+              <TextField label="Quote name" value={quoteName} onChange={setQuoteName} />
+              <TextField label="Customer" value={customer} onChange={setCustomer} />
+              <TextField label="Area / room" value={area} onChange={setArea} />
+            </div>
+          </section>
+
+          <section className="step-content">
+            <SectionTitle title="Scope Builder" subtitle="The next pass will define what this trade needs to count, measure, and price" />
+            <div className="metric-grid">
+              <div className="metric">
+                <span>Engine</span>
+                <strong>Separate</strong>
+              </div>
+              <div className="metric">
+                <span>Status</span>
+                <strong>Ready to scope</strong>
+              </div>
+            </div>
+          </section>
+        </div>
+
+        <aside className="cabinet-summary">
+          <section className="drawing-preview">
+            <div className="section-title">
+              <h2>{title} Summary</h2>
+              <p>{summary}</p>
+            </div>
+            <div className="result-band stacked">
+              <strong>Clean separation</strong>
+              <span>This will not share storefront or cabinet calculation rules unless we intentionally create shared primitives later.</span>
+            </div>
+          </section>
+        </aside>
+      </section>
     </main>
   );
 }

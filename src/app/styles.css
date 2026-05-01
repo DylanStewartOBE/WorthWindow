@@ -75,6 +75,186 @@ button {
   height: 38px;
 }
 
+.product-switch-button {
+  flex: 0 0 auto;
+  display: inline-flex;
+  min-height: 36px;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  padding: 0 10px;
+  font-size: 0.72rem;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.product-switch-button svg {
+  flex: 0 0 auto;
+}
+
+.product-landing-shell,
+.cabinet-shell {
+  width: min(1180px, 100%);
+  margin: 0 auto;
+  padding: max(18px, env(safe-area-inset-top)) 16px max(22px, env(safe-area-inset-bottom));
+}
+
+.product-landing-shell {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  min-height: 100svh;
+}
+
+.landing-header,
+.cabinet-topbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border-bottom: 1px solid rgba(203, 213, 225, 0.86);
+  background: rgba(248, 250, 252, 0.96);
+  padding-bottom: 14px;
+}
+
+.landing-brand {
+  display: flex;
+  align-items: center;
+  width: 178px;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+}
+
+.landing-logo-full {
+  display: block;
+  width: 172px;
+  height: auto;
+}
+
+.landing-logo-mark {
+  display: none;
+  width: 54px;
+  height: 54px;
+}
+
+.product-picker {
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 28px rgba(15, 23, 42, 0.06);
+  padding: 18px;
+}
+
+.product-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 12px;
+}
+
+.product-choice-card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 126px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #111827;
+  padding: 16px;
+  text-align: left;
+}
+
+.product-choice-card.window-wall {
+  border-color: #b8d2aa;
+  background: #f6faf4;
+}
+
+.product-choice-card.cabinets {
+  border-color: #d9c7a3;
+  background: #fffaf0;
+}
+
+.product-choice-card.plumbing {
+  border-color: #bae6fd;
+  background: #f0f9ff;
+}
+
+.product-choice-card.wine-room {
+  border-color: #d8b4fe;
+  background: #faf5ff;
+}
+
+.product-choice-card.bathroom {
+  border-color: #bfdbfe;
+  background: #eff6ff;
+}
+
+.product-choice-icon {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #48652f;
+}
+
+.product-choice-card span:nth-child(2) {
+  display: grid;
+  gap: 6px;
+}
+
+.product-choice-card strong {
+  font-size: 1.08rem;
+}
+
+.product-choice-card small {
+  color: #64748b;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.cabinet-shell {
+  min-height: 100svh;
+}
+
+.cabinet-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 15;
+  margin: calc(-1 * max(18px, env(safe-area-inset-top))) -16px 16px;
+  padding: max(8px, env(safe-area-inset-top)) 16px 8px;
+  backdrop-filter: blur(12px);
+}
+
+.cabinet-title {
+  min-width: 0;
+}
+
+.cabinet-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 390px;
+  gap: 16px;
+  align-items: start;
+}
+
+.cabinet-editor {
+  display: grid;
+  gap: 16px;
+}
+
+.cabinet-summary {
+  position: sticky;
+  top: calc(var(--sticky-control-height) + 12px);
+}
+
 .eyebrow {
   margin: 0 0 4px;
   color: #48652f;
@@ -1123,6 +1303,14 @@ h2 {
 }
 
 @media (max-width: 920px) {
+  .cabinet-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .cabinet-summary {
+    position: static;
+  }
+
   .workspace {
     grid-template-columns: 1fr;
     min-height: calc(100svh - var(--sticky-control-height) - 76px);
@@ -1170,6 +1358,48 @@ h2 {
 }
 
 @media (max-width: 640px) {
+  .product-landing-shell,
+  .cabinet-shell {
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
+  .landing-header {
+    align-items: flex-start;
+  }
+
+  .landing-brand {
+    width: 58px;
+  }
+
+  .landing-logo-full {
+    display: none;
+  }
+
+  .landing-logo-mark {
+    display: block;
+  }
+
+  .product-picker {
+    padding: 14px;
+  }
+
+  .product-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .product-choice-card {
+    min-height: 112px;
+    padding: 14px;
+  }
+
+  .cabinet-topbar {
+    margin-right: -12px;
+    margin-left: -12px;
+    padding-right: 12px;
+    padding-left: 12px;
+  }
+
   .app-shell {
     padding-left: 12px;
     padding-right: 12px;
@@ -1194,6 +1424,20 @@ h2 {
     display: block;
     width: 44px;
     height: 44px;
+  }
+
+  .product-switch-button {
+    width: 38px;
+    padding: 0;
+  }
+
+  .product-switch-button span {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
   }
 
   .step {

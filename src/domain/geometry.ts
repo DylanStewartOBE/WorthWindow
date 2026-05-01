@@ -1496,7 +1496,13 @@ function resolveDoorBayWidths(
   if (count === 1) return [roundToPrecision(total)];
 
   if (mode === "equal") {
-    return fitEqualDoorGlassWidths(count, total, doorColumnIndex, requiredDoorWidth, boundaryTypes, storefrontRules);
+    return fitEqualMultiDoorGlassWidths(
+      count,
+      total,
+      new Map([[doorColumnIndex, roundToPrecision(Math.min(Math.max(requiredDoorWidth, 0), total))]]),
+      boundaryTypes,
+      storefrontRules
+    );
   }
 
   const lockedDoorWidth = roundToPrecision(Math.min(Math.max(requiredDoorWidth, 0), total));
@@ -1669,53 +1675,6 @@ function resolveCustomDrivenSizes({
   return normalizeSizesToTotal(result, total, drivenIndexes[drivenIndexes.length - 1]);
 }
 
-function fitEqualDoorGlassWidths(
-  count: number,
-  total: number,
-  doorColumnIndex: number,
-  requiredDoorWidth: number,
-  boundaryTypes: VerticalBoundaryType[],
-  storefrontRules: StorefrontRulePack
-): number[] {
-  const doorWidth = roundToPrecision(Math.min(Math.max(requiredDoorWidth, 0), total));
-  const oddIndex = getDoorOddColumnIndex(count, doorColumnIndex);
-  const regularIndexes = Array.from({ length: count }, (_, index) => index).filter(
-    (index) => index !== doorColumnIndex && index !== oddIndex
-  );
-
-  if (regularIndexes.length === 0) {
-    return fitSizesToExactIndex(Array.from({ length: count }, () => 1), total, doorColumnIndex, doorWidth);
-  }
-
-  const equalWidth = roundToPrecision(total / count);
-  const oddWidth = oddIndex === null ? 0 : roundToPrecision(equalWidth + (equalWidth - doorWidth));
-  if (oddIndex !== null && oddWidth <= 0) {
-    return fitSizesToExactIndex(Array.from({ length: count }, () => 1), total, doorColumnIndex, doorWidth);
-  }
-
-  const regularWidthTotal = roundToPrecision(total - doorWidth - oddWidth);
-  const totalRegularDeduction = regularIndexes.reduce(
-    (sum, index) => sum + getBayVerticalDeduction(index, boundaryTypes, storefrontRules),
-    0
-  );
-  const targetDloWidth = roundToPrecision((regularWidthTotal - totalRegularDeduction) / regularIndexes.length);
-  if (targetDloWidth <= 0) {
-    return fitSizesToExactIndex(Array.from({ length: count }, () => 1), total, doorColumnIndex, doorWidth);
-  }
-
-  const result = Array.from({ length: count }, () => 0);
-  result[doorColumnIndex] = doorWidth;
-  if (oddIndex !== null) {
-    result[oddIndex] = oddWidth;
-  }
-
-  regularIndexes.forEach((index) => {
-    result[index] = roundToPrecision(targetDloWidth + getBayVerticalDeduction(index, boundaryTypes, storefrontRules));
-  });
-
-  return normalizeSizesToTotal(result, total, regularIndexes[regularIndexes.length - 1] ?? oddIndex ?? doorColumnIndex);
-}
-
 function fitEqualMultiDoorGlassWidths(
   count: number,
   total: number,
@@ -1850,15 +1809,6 @@ function scaleSizes(baseSizes: number[], total: number): number[] {
   const sum = baseSizes.reduce((running, size) => running + size, 0);
   if (sum <= 0) return Array.from({ length: baseSizes.length }, () => roundToPrecision(total / baseSizes.length));
   return baseSizes.map((size) => roundToPrecision((size / sum) * total));
-}
-
-function getDoorOddColumnIndex(columns: number, doorColumnIndex: number): number | null {
-  const leftCount = doorColumnIndex;
-  const rightCount = columns - doorColumnIndex - 1;
-
-  if (leftCount === rightCount) return null;
-  if (leftCount === 0 || rightCount === 0) return null;
-  return leftCount < rightCount ? 0 : columns - 1;
 }
 
 function getBayVerticalDeduction(

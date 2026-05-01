@@ -707,7 +707,7 @@ describe("FG-2000 calculation engine", () => {
     expect(shiftedRightBottomLites[0].mark).toBe(shiftedRightBottomLites[1].mark);
   });
 
-  it("locks an off-center single door bay to the door package and pushes the remainder into one outer bay", () => {
+  it("locks an off-center single door bay and equalizes the remaining glass widths", () => {
     const storefrontRulePack = structuredClone(defaultStorefrontRulePack);
     storefrontRulePack.perimeterJoints = { head: 0, sill: 0, leftJamb: 0, rightJamb: 0 };
     storefrontRulePack.sightlines = {
@@ -742,16 +742,17 @@ describe("FG-2000 calculation engine", () => {
     );
     const [bay1, bay2, bay3, bay4] = elevation.computedGeometry.columnWidths;
     const door = elevation.computedGeometry.doorOpenings[0];
-    const rightBottomLites = elevation.computedGeometry.lites.filter((lite) => lite.rowIndex === 0 && lite.columnIndex >= 2);
+    const nonDoorBottomLites = elevation.computedGeometry.lites.filter((lite) => lite.rowIndex === 0);
 
-    expect(bay1).toBeCloseTo(22);
+    expect(bay1).toBeCloseTo(27.667);
     expect(bay2).toBeCloseTo(38);
-    expect(bay4).toBeGreaterThan(bay3);
-    expect(door.x).toBeCloseTo(23);
+    expect(bay3).toBeCloseTo(26.667);
+    expect(bay4).toBeCloseTo(27.666);
+    expect(door.x).toBeCloseTo(28.667);
     expect(door.width).toBe(36);
-    expect(rightBottomLites).toHaveLength(2);
-    expect(rightBottomLites[0].glassWidth).toBeCloseTo(rightBottomLites[1].glassWidth);
-    expect(rightBottomLites[0].mark).toBe(rightBottomLites[1].mark);
+    expect(nonDoorBottomLites).toHaveLength(3);
+    expect(new Set(nonDoorBottomLites.map((lite) => lite.glassWidth))).toEqual(new Set([25.3125]));
+    expect(new Set(nonDoorBottomLites.map((lite) => lite.mark))).toEqual(new Set(["G1"]));
   });
 
   it("groups equal off-center single-door glass under one tag on the long side", () => {
@@ -778,8 +779,51 @@ describe("FG-2000 calculation engine", () => {
 
     expect(new Set(rightBottomLites.map((lite) => lite.mark)).size).toBe(1);
     expect(new Set(rightTopLites.map((lite) => lite.mark)).size).toBe(1);
-    expect(new Set(rightBottomLites.map((lite) => lite.glassWidth))).toEqual(new Set([34.4375]));
-    expect(new Set(rightTopLites.map((lite) => lite.glassWidth))).toEqual(new Set([34.4375]));
+    expect(new Set(rightBottomLites.map((lite) => lite.glassWidth))).toEqual(new Set([33.8125]));
+    expect(new Set(rightTopLites.map((lite) => lite.glassWidth))).toEqual(new Set([33.8125]));
+  });
+
+  it("keeps the short side glass equal to the long side when a single door is off center", () => {
+    const elevation = calculateElevation(
+      {
+        ...pairDoorSeedInput,
+        columns: 5,
+        columnSizingMode: "equal",
+        columnWidths: [1, 1, 1, 1, 1],
+        kneeWalls: [{ columnIndex: 0, height: 16 }],
+        doorConfig: {
+          ...pairDoorSeedInput.doorConfig,
+          doorType: "single",
+          widthPerLeaf: 36,
+          locationMode: "custom",
+          columnIndex: 3,
+          doorSetCount: 1,
+          doorSets: [
+            {
+              ...pairDoorSeedInput.doorConfig.doorSets[0],
+              doorType: "single",
+              widthPerLeaf: 36,
+              locationMode: "custom",
+              columnIndex: 3
+            }
+          ]
+        }
+      },
+      context
+    );
+
+    expect(elevation.computedGlass.items.find((item) => item.mark === "G1")).toMatchObject({
+      qty: 1,
+      location: "R1C1",
+      width: 33.8125,
+      height: 66.875
+    });
+    expect(elevation.computedGlass.items.find((item) => item.mark === "G3")).toMatchObject({
+      qty: 3,
+      location: "R1C2, R1C3, R1C5",
+      width: 33.8125,
+      height: 82.875
+    });
   });
 
   it("draws door guide lines from the latch-side corners to the hinge-side midpoint", () => {

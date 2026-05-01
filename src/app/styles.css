@@ -598,7 +598,7 @@ h2 {
   align-items: center;
   justify-content: center;
   justify-self: center;
-  gap: 4px;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -606,13 +606,17 @@ h2 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  min-height: 28px;
+  width: 34px;
+  height: 34px;
   border: 1px solid #cbd5e1;
   border-radius: 7px;
   background: #ffffff;
   color: #334155;
   padding: 0;
+}
+
+.preview-nav-button svg {
+  display: block;
 }
 
 .preview-nav-button:disabled {
@@ -1178,7 +1182,8 @@ h2 {
   }
 
   .brand-lockup {
-    flex-basis: 42px;
+    flex-basis: 52px;
+    justify-content: center;
   }
 
   .brand-logo-full {
@@ -1187,6 +1192,8 @@ h2 {
 
   .brand-logo-mark {
     display: block;
+    width: 44px;
+    height: 44px;
   }
 
   .step {

@@ -349,6 +349,12 @@ function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
     setStatus(statusMessage);
   };
 
+  const rememberActiveElevation = () => {
+    if (input.jobId !== job.id || !job.elevationIds.includes(input.id)) return;
+    setSavedElevations((current) => uniqueById([...current, elevation]));
+    repository.saveElevation(elevation).catch(() => setStatus("Elevation changes are in memory until local storage is available"));
+  };
+
   const startNewJob = () => {
     const nextJob = createBlankJob(job.createdBy || "Dylan Stewart");
     const nextInput = createBlankElevationInput(nextJob.id, nextJob.createdBy);
@@ -365,9 +371,13 @@ function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
   const loadExistingJob = (jobId: string) => {
     const nextJob = savedJobs.map(normalizeJob).find((item) => item.id === jobId);
     if (!nextJob) return;
+    if (nextJob.id !== job.id) {
+      rememberActiveElevation();
+    }
+    const availableElevations = uniqueById([...savedElevations, elevation, ...jobElevations]);
     const nextElevation =
-      savedElevations.find((item) => item.id === nextJob.activeElevationId) ??
-      savedElevations.find((item) => item.jobId === nextJob.id);
+      availableElevations.find((item) => item.id === nextJob.activeElevationId) ??
+      availableElevations.find((item) => item.jobId === nextJob.id);
     setJob(nextJob);
     if (nextElevation) {
       setInput(toInput(nextElevation));
@@ -380,7 +390,9 @@ function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
   };
 
   const createElevationForJob = () => {
-    const template = getFirstElevationTemplate(job, savedElevations, input);
+    const availableElevations = uniqueById([...savedElevations, elevation, ...jobElevations]);
+    const template = getFirstElevationTemplate(job, availableElevations, input);
+    rememberActiveElevation();
     const nextInput = inheritHorizontalPattern(
       createBlankElevationInput(job.id, job.createdBy || "Dylan Stewart"),
       template,
@@ -452,11 +464,13 @@ function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
 
   const loadJobElevation = (elevationId: string) => {
     if (elevationId === input.id) return;
-    const nextElevation = savedElevations.find((item) => item.id === elevationId);
+    const availableElevations = uniqueById([...savedElevations, elevation, ...jobElevations]);
+    const nextElevation = availableElevations.find((item) => item.id === elevationId);
     if (!nextElevation) return;
+    rememberActiveElevation();
     const nextJob = normalizeJob({ ...job, activeElevationId: elevationId });
     const baseInput = toInput(nextElevation);
-    const nextInput = inheritCornerReturnPatternOnLoad(baseInput, nextJob, savedElevations);
+    const nextInput = inheritCornerReturnPatternOnLoad(baseInput, nextJob, availableElevations);
     setInput(nextInput);
     if (nextInput !== baseInput) {
       const syncedElevation = calculateElevation(nextInput, calculationContext);

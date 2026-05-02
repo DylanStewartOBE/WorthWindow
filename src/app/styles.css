@@ -856,11 +856,12 @@ h2 {
 }
 
 .preview-elevation-control {
-  display: inline-flex;
+  display: inline-grid;
+  grid-template-columns: 30px minmax(76px, auto) 30px;
   align-items: center;
   justify-content: center;
   justify-self: center;
-  gap: 8px;
+  gap: 6px;
   min-width: 0;
 }
 
@@ -868,17 +869,22 @@ h2 {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 34px;
-  border: 1px solid #cbd5e1;
+  width: 30px;
+  height: 30px;
+  border: 0;
   border-radius: 7px;
-  background: #ffffff;
+  background: transparent;
   color: #334155;
   padding: 0;
 }
 
 .preview-nav-button svg {
   display: block;
+}
+
+.preview-nav-button:not(:disabled):hover,
+.preview-nav-button:not(:disabled):focus-visible {
+  background: #eef2f7;
 }
 
 .preview-nav-button:disabled {
@@ -1395,32 +1401,27 @@ h2 {
 
   .workspace {
     grid-template-columns: 1fr;
-    min-height: calc(100svh - var(--sticky-control-height) - 76px);
-    padding-bottom: 84px;
+    min-height: 0;
+    padding-bottom: 12px;
   }
 
   .work-panel {
     display: grid;
-    max-height: calc(100svh - var(--sticky-control-height) - min(420px, 52vh) - 84px);
-    overflow-y: auto;
-    overscroll-behavior: contain;
-    scrollbar-width: none;
-  }
-
-  .work-panel::-webkit-scrollbar {
-    display: none;
+    max-height: none;
+    overflow: visible;
   }
 
   .work-panel > .step-content {
-    min-height: 100%;
+    min-height: 0;
   }
 
   .preview-panel {
+    position: static;
     order: -1;
-    top: var(--sticky-control-height);
-    z-index: 12;
-    margin-top: -16px;
-    padding-top: 16px;
+    top: auto;
+    z-index: auto;
+    margin-top: 0;
+    padding-top: 0;
     padding-bottom: 10px;
     background: #f8fafc;
   }

@@ -732,6 +732,88 @@ h2 {
   font-size: 1rem;
 }
 
+.quote-summary-panel {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 14px;
+  border: 1px solid #d9e2ec;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.quote-summary-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid #e5e7eb;
+  padding-bottom: 10px;
+}
+
+.quote-summary-header span,
+.quote-summary-row dt {
+  color: #64748b;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.quote-summary-header strong {
+  display: block;
+  margin-top: 4px;
+  color: #111827;
+  font-size: 1.35rem;
+}
+
+.quote-summary-header small {
+  max-width: 190px;
+  color: #48652f;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-align: right;
+}
+
+.quote-summary-rows {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+}
+
+.quote-summary-row {
+  display: grid;
+  grid-template-columns: minmax(110px, 0.8fr) minmax(0, 1.2fr);
+  gap: 10px;
+  align-items: baseline;
+}
+
+.quote-summary-row dd {
+  margin: 0;
+  color: #111827;
+  font-size: 0.86rem;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+  text-align: right;
+}
+
+.quote-summary-row.materials dd,
+.quote-summary-row.totals dd {
+  font-variant-numeric: tabular-nums;
+}
+
+.quote-summary-footnotes {
+  display: grid;
+  gap: 5px;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 10px;
+}
+
+.quote-summary-footnotes p {
+  margin: 0;
+  color: #64748b;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
 .review-actions {
   margin-bottom: 14px;
 }
@@ -1455,8 +1537,19 @@ h2 {
   .field-grid,
   .field-grid.compact,
   .metric-grid,
+  .quote-summary-row,
   .sample-actions {
     grid-template-columns: 1fr;
+  }
+
+  .quote-summary-header {
+    display: grid;
+  }
+
+  .quote-summary-header small,
+  .quote-summary-row dd {
+    max-width: none;
+    text-align: left;
   }
 
   .step-content,

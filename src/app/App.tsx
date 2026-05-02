@@ -26,6 +26,7 @@ import {
   defaultBranding,
   defaultEntranceRulePack,
   defaultNoteLibrary,
+  defaultQuoteRulePack,
   defaultStorefrontRulePack,
   defaultValidationLibrary,
   finishOptions,
@@ -40,6 +41,7 @@ import { getDoorGlassCalloutMap } from "../domain/glass";
 import { getDoorColumnIndex } from "../domain/geometry";
 import { getKneeWallRuns } from "../domain/kneeWall";
 import { createSquaredMeasurementSet } from "../domain/measurements";
+import { buildStorefrontQuotePresentation, type QuotePresentation } from "../domain/quotePresentation";
 import { createRevisionSnapshot, getNextRevisionNumber } from "../domain/revision";
 import type {
   BrandingConfig,
@@ -59,6 +61,7 @@ import type {
   LiteSplitConfig,
   LiteSplitOrientation,
   NoteLibrary,
+  QuoteRulePack,
   StorefrontRulePack,
   ValidationLibrary
 } from "../domain/types";
@@ -84,6 +87,7 @@ const steps = [
 type ConfigState = {
   storefrontRulePack: StorefrontRulePack;
   entranceRulePack: EntranceRulePack;
+  quoteRulePack: QuoteRulePack;
   noteLibrary: NoteLibrary;
   validationLibrary: ValidationLibrary;
   branding: BrandingConfig;
@@ -141,6 +145,7 @@ type PlanCorner = {
 const initialConfig: ConfigState = {
   storefrontRulePack: defaultStorefrontRulePack,
   entranceRulePack: defaultEntranceRulePack,
+  quoteRulePack: defaultQuoteRulePack,
   noteLibrary: defaultNoteLibrary,
   validationLibrary: defaultValidationLibrary,
   branding: defaultBranding
@@ -239,6 +244,10 @@ function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
     const order = new Map(job.elevationIds.map((id, index) => [id, index]));
     return merged.sort((a, b) => (order.get(a.id) ?? 999) - (order.get(b.id) ?? 999) || a.name.localeCompare(b.name));
   }, [elevation, input.jobId, job, savedElevations]);
+  const quotePresentation = useMemo(
+    () => buildStorefrontQuotePresentation(jobElevations, job, config.quoteRulePack),
+    [config.quoteRulePack, job, jobElevations]
+  );
   const cornerPlan = useMemo(
     () => getJobPlanContext(jobElevations, elevation, config.storefrontRulePack),
     [config.storefrontRulePack, elevation, jobElevations]
@@ -868,7 +877,7 @@ function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
   };
 
   const generateQuote = () => {
-    const quoteBlob = generateJobQuotePdf(jobElevations, job, config.branding);
+    const quoteBlob = generateJobQuotePdf(jobElevations, job, config.branding, config.quoteRulePack);
     const quoteUrl = downloadBlob(quoteBlob, pdfFileName(job, null, "quote"));
     setPdfUrls((current) => ({ ...current, quote: quoteUrl }));
     setStatus("Job customer quote generated");
@@ -1016,6 +1025,7 @@ function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
           {activeStep === 5 && (
             <ReviewStep
               elevation={elevation}
+              quotePresentation={quotePresentation}
               showAssemblyNumbers={showAssemblyNumbers}
               setShowAssemblyNumbers={setShowAssemblyNumbers}
             />
@@ -1024,6 +1034,7 @@ function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
             <OutputStep
               elevation={elevation}
               job={job}
+              quotePresentation={quotePresentation}
               pdfUrls={pdfUrls}
               onGenerate={generatePdfs}
               onGenerateQuote={generateQuote}
@@ -1934,10 +1945,12 @@ function ProductStep({
 
 function ReviewStep({
   elevation,
+  quotePresentation,
   showAssemblyNumbers,
   setShowAssemblyNumbers
 }: {
   elevation: Elevation;
+  quotePresentation: QuotePresentation;
   showAssemblyNumbers: boolean;
   setShowAssemblyNumbers: (show: boolean) => void;
 }) {
@@ -1952,6 +1965,7 @@ function ReviewStep({
         <Metric label="Lites" value={String(elevation.computedGeometry.lites.length)} />
         <Metric label="Glass rows" value={String(elevation.computedGlass.items.length)} />
       </div>
+      <QuoteSummaryPanel presentation={quotePresentation} />
       <div className="review-actions">
         <button
           type="button"
@@ -1971,6 +1985,7 @@ function ReviewStep({
 function OutputStep({
   elevation,
   job,
+  quotePresentation,
   pdfUrls,
   onGenerate,
   onGenerateQuote,
@@ -1982,6 +1997,7 @@ function OutputStep({
 }: {
   elevation: Elevation;
   job: Job;
+  quotePresentation: QuotePresentation;
   pdfUrls: { package?: string; quote?: string };
   onGenerate: () => void;
   onGenerateQuote: () => void;
@@ -1994,6 +2010,7 @@ function OutputStep({
   return (
     <section className="step-content">
       <SectionTitle title="Output" subtitle="PDF package and revisions" />
+      <QuoteSummaryPanel presentation={quotePresentation} />
       <div className="button-stack">
         <button className="primary-button wide" onClick={onGenerate}>
           <FileDown size={18} />
@@ -2035,6 +2052,36 @@ function OutputStep({
       <div className="revision-list">
         <strong>Local elevations</strong>
         {savedElevations.length === 0 ? <span>No saved revisions yet.</span> : savedElevations.map((item) => <span key={item.id}>{item.name}</span>)}
+      </div>
+    </section>
+  );
+}
+
+function QuoteSummaryPanel({ presentation }: { presentation: QuotePresentation }) {
+  return (
+    <section className="quote-summary-panel" aria-label="Quote summary">
+      <div className="quote-summary-header">
+        <div>
+          <span>Customer quote</span>
+          <strong>{presentation.totals.totalDisplay}</strong>
+        </div>
+        <small>{presentation.pricingProfile.displayName}</small>
+      </div>
+      <dl className="quote-summary-rows">
+        {presentation.outputRows.map((row) => (
+          <div key={row.id} className={`quote-summary-row ${row.section}`}>
+            <dt>{row.label}</dt>
+            <dd>{row.value}</dd>
+          </div>
+        ))}
+      </dl>
+      <div className="quote-summary-footnotes">
+        {presentation.assumptions.map((assumption) => (
+          <p key={assumption}>{assumption}</p>
+        ))}
+        {presentation.exclusions.map((exclusion) => (
+          <p key={exclusion}>{exclusion}</p>
+        ))}
       </div>
     </section>
   );
@@ -2576,6 +2623,7 @@ function AdminPanel({
   const [draft, setDraft] = useState({
     storefrontRulePack: JSON.stringify(config.storefrontRulePack, null, 2),
     entranceRulePack: JSON.stringify(config.entranceRulePack, null, 2),
+    quoteRulePack: JSON.stringify(config.quoteRulePack, null, 2),
     noteLibrary: JSON.stringify(config.noteLibrary, null, 2),
     validationLibrary: JSON.stringify(config.validationLibrary, null, 2),
     branding: JSON.stringify(config.branding, null, 2)
@@ -2587,6 +2635,7 @@ function AdminPanel({
       setConfig({
         storefrontRulePack: JSON.parse(draft.storefrontRulePack),
         entranceRulePack: JSON.parse(draft.entranceRulePack),
+        quoteRulePack: JSON.parse(draft.quoteRulePack),
         noteLibrary: JSON.parse(draft.noteLibrary),
         validationLibrary: JSON.parse(draft.validationLibrary),
         branding: JSON.parse(draft.branding)
@@ -2610,6 +2659,7 @@ function AdminPanel({
         </div>
         <ConfigEditor label="Storefront rule pack" value={draft.storefrontRulePack} onChange={(value) => setDraft((current) => ({ ...current, storefrontRulePack: value }))} />
         <ConfigEditor label="Entrance rule pack" value={draft.entranceRulePack} onChange={(value) => setDraft((current) => ({ ...current, entranceRulePack: value }))} />
+        <ConfigEditor label="Quote pricing rule pack" value={draft.quoteRulePack} onChange={(value) => setDraft((current) => ({ ...current, quoteRulePack: value }))} />
         <ConfigEditor label="Note library" value={draft.noteLibrary} onChange={(value) => setDraft((current) => ({ ...current, noteLibrary: value }))} />
         <ConfigEditor label="Validation library" value={draft.validationLibrary} onChange={(value) => setDraft((current) => ({ ...current, validationLibrary: value }))} />
         <ConfigEditor label="Branding" value={draft.branding} onChange={(value) => setDraft((current) => ({ ...current, branding: value }))} />

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   defaultEntranceRulePack,
   defaultNoteLibrary,
+  defaultQuoteRulePack,
   defaultStorefrontRulePack,
   defaultValidationLibrary
 } from "../src/config/options";
@@ -20,9 +21,10 @@ import { getDoorColumnIndex } from "../src/domain/geometry";
 import { createSquaredMeasurementSet, getGoverningDimensions } from "../src/domain/measurements";
 import { buildMetalTakeoff } from "../src/domain/metal";
 import { calculateQuoteSummary } from "../src/domain/quote";
+import { buildStorefrontQuotePresentation } from "../src/domain/quotePresentation";
 import { createRevisionSnapshot, getNextRevisionNumber } from "../src/domain/revision";
 import type { ElevationInput } from "../src/domain/types";
-import { noDoorSeedInput, pairDoorSeedInput } from "../src/data/seed";
+import { noDoorSeedInput, pairDoorSeedInput, seedJob } from "../src/data/seed";
 
 const context: CalculationContext = {
   storefrontRulePack: defaultStorefrontRulePack,
@@ -165,8 +167,10 @@ describe("FG-2000 calculation engine", () => {
 
   it("calculates customer quote from opening square footage and door adders", () => {
     const elevation = calculateElevation(pairDoorSeedInput, context);
-    const quote = calculateQuoteSummary(elevation);
+    const quote = calculateQuoteSummary(elevation, defaultQuoteRulePack);
 
+    expect(quote.pricingProfileName).toBe("Worth Baseline Quote Pricing");
+    expect(quote.pricingProfileVersion).toBe("0.1.0");
     expect(quote.openingSquareFeet).toBe(134.66);
     expect(quote.doorOpeningSquareFeet).toBe(42);
     expect(quote.quotedStorefrontSquareFeet).toBe(92.66);
@@ -180,7 +184,56 @@ describe("FG-2000 calculation engine", () => {
     expect(quote.singleDoorCount).toBe(0);
     expect(quote.pairDoorCount).toBe(1);
     expect(quote.doorCost).toBe(4500);
+    expect(quote.subtotal).toBe(7033.62);
+    expect(quote.marginAmount).toBe(0);
     expect(quote.total).toBe(7033.62);
+  });
+
+  it("calculates customer quote totals from the supplied quote rule pack", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+    const quoteRulePack = structuredClone(defaultQuoteRulePack);
+    quoteRulePack.name = "Test Pricing";
+    quoteRulePack.version = "99.0.0";
+    quoteRulePack.rates = {
+      glassPerSquareFoot: 1,
+      aluminumPerLinearFoot: 2,
+      highHeavyGlassPremiumPerSquareFoot: 3,
+      lowHeavyGlassPremiumPerSquareFoot: 4,
+      singleDoorAdder: 100,
+      pairDoorAdder: 200
+    };
+    quoteRulePack.margin.percent = 10;
+
+    const quote = calculateQuoteSummary(elevation, quoteRulePack);
+
+    expect(quote.pricingProfileName).toBe("Test Pricing");
+    expect(quote.pricingProfileVersion).toBe("99.0.0");
+    expect(quote.glassCost).toBe(110.73);
+    expect(quote.aluminumCost).toBe(145.88);
+    expect(quote.highHeavyGlassPremiumCost).toBe(175.26);
+    expect(quote.doorCost).toBe(200);
+    expect(quote.subtotal).toBe(631.87);
+    expect(quote.marginAmount).toBe(63.19);
+    expect(quote.total).toBe(695.06);
+  });
+
+  it("builds shared quote presentation rows from the same summary used by PDF and UI", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+    const quote = calculateQuoteSummary(elevation, defaultQuoteRulePack);
+    const presentation = buildStorefrontQuotePresentation([elevation], seedJob, defaultQuoteRulePack);
+    const rowsById = new Map(presentation.outputRows.map((row) => [row.id, row]));
+
+    expect(presentation.pricingProfile.displayName).toBe("Worth Baseline Quote Pricing v0.1.0");
+    expect(presentation.totals.total).toBe(quote.total);
+    expect(presentation.totals.totalDisplay).toBe("$7,033.62");
+    expect(rowsById.get("job")?.value).toBe("WC-2000 Worth Construction Demo Storefront");
+    expect(rowsById.get("scope")?.value).toBe("E1 Pair doors with sidelites");
+    expect(rowsById.get("glass-total")).toMatchObject({ value: "$1,384.13", amount: quote.glassCost });
+    expect(rowsById.get("aluminum-total")).toMatchObject({ value: "$565.29", amount: quote.aluminumCost });
+    expect(rowsById.get("door-total")).toMatchObject({ value: "$4,500.00", amount: quote.doorCost });
+    expect(presentation.outputRows.every((row) => row.customerVisible)).toBe(true);
+    expect(presentation.internalRows.some((row) => row.id === "pricing-profile-id" && !row.customerVisible)).toBe(true);
+    expect(presentation.exclusions[0]).toContain("Quote excludes engineering");
   });
 
   it("groups generated storefront members into a metal takeoff", () => {

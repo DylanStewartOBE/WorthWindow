@@ -411,6 +411,31 @@ export interface EntranceRulePack {
   notes: string[];
 }
 
+export interface QuoteRulePack {
+  id: string;
+  name: string;
+  version: string;
+  effectiveDate: string;
+  owner: string;
+  rates: {
+    glassPerSquareFoot: number;
+    aluminumPerLinearFoot: number;
+    highHeavyGlassPremiumPerSquareFoot: number;
+    lowHeavyGlassPremiumPerSquareFoot: number;
+    singleDoorAdder: number;
+    pairDoorAdder: number;
+  };
+  margin: {
+    percent: number;
+  };
+  heavyGlassThresholds: {
+    highHeightInches: Inches;
+    highWeightPounds: number;
+    lowWeightPounds: number;
+  };
+  assumptions: string[];
+}
+
 export interface NoteLibrary {
   system: Record<string, string>;
   finish: Record<string, string>;

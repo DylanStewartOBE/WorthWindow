@@ -1,5 +1,6 @@
 import storefrontRulePackJson from "./rulepacks/fg2000-baseline.json";
 import entranceRulePackJson from "./rulepacks/entrance-ws500.json";
+import quoteRulePackJson from "./rulepacks/quote-pricing.json";
 import noteLibraryJson from "./note-library.json";
 import validationLibraryJson from "./validation-library.json";
 import brandingJson from "./branding.json";
@@ -7,12 +8,14 @@ import type {
   BrandingConfig,
   EntranceRulePack,
   NoteLibrary,
+  QuoteRulePack,
   StorefrontRulePack,
   ValidationLibrary
 } from "../domain/types";
 
 export const defaultStorefrontRulePack = storefrontRulePackJson as StorefrontRulePack;
 export const defaultEntranceRulePack = entranceRulePackJson as EntranceRulePack;
+export const defaultQuoteRulePack = quoteRulePackJson as QuoteRulePack;
 export const defaultNoteLibrary = noteLibraryJson as NoteLibrary;
 export const defaultValidationLibrary = validationLibraryJson as ValidationLibrary;
 export const defaultBranding = brandingJson as BrandingConfig;
@@ -42,4 +45,3 @@ export const thresholdOptions = [
   { id: "no-threshold", label: "No raised threshold" },
   { id: "field-verify", label: "Field verify transition" }
 ];
-

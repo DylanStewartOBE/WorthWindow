@@ -12,8 +12,8 @@ import {
 import { formatFeetInches, formatInches } from "../domain/format";
 import { getKneeWallRuns } from "../domain/kneeWall";
 import { buildMetalTakeoff, type MetalTakeoffLine } from "../domain/metal";
-import { calculateJobQuoteSummary, calculateQuoteSummary } from "../domain/quote";
-import type { BrandingConfig, Elevation, GlassItem, Job, Lite, ValidationFlag } from "../domain/types";
+import { buildStorefrontQuotePresentation, type QuotePresentation } from "../domain/quotePresentation";
+import type { BrandingConfig, Elevation, GlassItem, Job, Lite, QuoteRulePack, ValidationFlag } from "../domain/types";
 
 const LETTER_LANDSCAPE = {
   width: 792,
@@ -92,15 +92,16 @@ export function generateJobDrawingPackagePdf(elevations: Elevation[], job: Job, 
   return doc.output("blob");
 }
 
-export function generateQuotePdf(elevation: Elevation, job: Job, branding: BrandingConfig): Blob {
-  return generateJobQuotePdf([elevation], job, branding);
+export function generateQuotePdf(elevation: Elevation, job: Job, branding: BrandingConfig, quoteRulePack: QuoteRulePack): Blob {
+  return generateJobQuotePdf([elevation], job, branding, quoteRulePack);
 }
 
-export function generateJobQuotePdf(elevations: Elevation[], job: Job, branding: BrandingConfig): Blob {
+export function generateJobQuotePdf(elevations: Elevation[], job: Job, branding: BrandingConfig, quoteRulePack: QuoteRulePack): Blob {
   const quoteElevations = ensureElevations(elevations);
+  const quotePresentation = buildStorefrontQuotePresentation(quoteElevations, job, quoteRulePack);
   const doc = new jsPDF({ orientation: "landscape", unit: "pt", format: "letter" });
   drawSheetChrome(doc, "CUSTOMER QUOTE", "Q-1", quoteElevations[0], job, branding, "All elevations");
-  drawQuoteSheet(doc, quoteElevations, job, 54, 130, 684);
+  drawQuoteSheet(doc, quotePresentation, 54, 130, 684);
   return doc.output("blob");
 }
 
@@ -1000,70 +1001,26 @@ function normalizeGlassDimension(value: number): string {
   return String(Math.round(value * 16) / 16);
 }
 
-function drawQuoteSheet(doc: jsPDF, elevations: Elevation[], job: Job, x: number, y: number, width: number) {
-  const quote = elevations.length === 1 ? calculateQuoteSummary(elevations[0]) : calculateJobQuoteSummary(elevations);
-  const rows = [
-    ["Job", `${job.number || "-"} ${job.name || ""}`.trim()],
-    ["Customer", job.customer || "-"],
-    ["Elevations", elevations.map((elevation, index) => `E${index + 1} ${elevation.name}`).join(", ")],
-    ["Opening area", `${formatSquareFeet(quote.openingSquareFeet)} sq ft total`],
-    ["Glass", `${formatSquareFeet(quote.glassSquareFeet)} sq ft @ ${formatCurrency(quote.glassRatePerSquareFoot)} / sq ft`],
-    ["Glass total", formatCurrency(quote.glassCost)],
-    ["Aluminum", `${quote.aluminumLinearFeet.toFixed(2)} ln ft @ ${formatCurrency(quote.aluminumRatePerLinearFoot)} / ln ft`],
-    ["Aluminum total", formatCurrency(quote.aluminumCost)]
-  ];
-
-  if (quote.doorOpeningSquareFeet > 0) {
-    rows.splice(4, 0, ["Door opening area", `${formatSquareFeet(quote.doorOpeningSquareFeet)} sq ft noted separately`]);
-  }
-
-  if (quote.highHeavyGlassSquareFeet > 0) {
-    rows.push([
-      "High/heavy glass premium",
-      `${formatSquareFeet(quote.highHeavyGlassSquareFeet)} sq ft @ +${formatCurrency(quote.highHeavyGlassPremiumRate)} / sq ft`
-    ]);
-    rows.push(["Premium total", formatCurrency(quote.highHeavyGlassPremiumCost)]);
-  }
-
-  if (quote.lowHeavyGlassSquareFeet > 0) {
-    rows.push([
-      "Heavy glass handling premium",
-      `${formatSquareFeet(quote.lowHeavyGlassSquareFeet)} sq ft under 5'-0" @ +${formatCurrency(quote.lowHeavyGlassPremiumRate)} / sq ft`
-    ]);
-    rows.push(["Heavy handling total", formatCurrency(quote.lowHeavyGlassPremiumCost)]);
-  }
-
-  if (quote.singleDoorCount > 0) {
-    rows.push(["Single doors", `${quote.singleDoorCount} @ ${formatCurrency(quote.singleDoorPrice)}`]);
-  }
-
-  if (quote.pairDoorCount > 0) {
-    rows.push(["Pair doors", `${quote.pairDoorCount} @ ${formatCurrency(quote.pairDoorPrice)}`]);
-  }
-
-  if (quote.doorCost > 0) {
-    rows.push(["Door total", formatCurrency(quote.doorCost)]);
-  }
-
+function drawQuoteSheet(doc: jsPDF, presentation: QuotePresentation, x: number, y: number, width: number) {
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("Customer Quote", x, y);
+  doc.text(presentation.title, x, y);
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
-  doc.text("Budgetary field quote based on job glass, aluminum length, heavy-glass handling, and standard entrance adders.", x, y + 16);
+  doc.text(presentation.intro, x, y + 16);
 
   let currentY = y + 42;
   doc.setDrawColor(17, 24, 39);
-  rows.forEach(([label, value], index) => {
+  presentation.outputRows.forEach((row, index) => {
     if (index % 2 === 0) {
       doc.setFillColor(248, 250, 252);
       doc.rect(x, currentY - 14, width, 24, "F");
     }
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
-    doc.text(label, x + 10, currentY);
+    doc.text(row.label, x + 10, currentY);
     doc.setFont("helvetica", "normal");
-    doc.text(value, x + 190, currentY);
+    doc.text(row.value, x + 190, currentY);
     currentY += 24;
   });
 
@@ -1073,12 +1030,17 @@ function drawQuoteSheet(doc: jsPDF, elevations: Elevation[], job: Job, x: number
   doc.setFont("helvetica", "bold");
   doc.setFontSize(13);
   doc.text("Estimated Total", x + 12, currentY + 35);
-  doc.text(formatCurrency(quote.total), x + width - 12, currentY + 35, { align: "right" });
+  doc.text(presentation.totals.totalDisplay, x + width - 12, currentY + 35, { align: "right" });
   doc.setTextColor(17, 24, 39);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(7);
-  doc.text("Quote excludes engineering, structural review, taxes, permit fees, special hardware, and field conditions not captured in this v1 estimator.", x, currentY + 68);
+  doc.text(
+    presentation.exclusions[0] ??
+      "Quote excludes engineering, structural review, taxes, permit fees, special hardware, and uncaptured field conditions.",
+    x,
+    currentY + 68
+  );
 }
 
 function drawWrappedList(doc: jsPDF, items: string[], x: number, y: number, width: number, lineHeight: number) {
@@ -1167,10 +1129,6 @@ function formatWeight(value: number): string {
 function formatKneeWallRunLabel(startColumnIndex: number, endColumnIndex: number): string {
   if (startColumnIndex === endColumnIndex) return `A${startColumnIndex + 1}`;
   return `A${startColumnIndex + 1}-A${endColumnIndex + 1}`;
-}
-
-function formatCurrency(value: number): string {
-  return new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 2 }).format(value);
 }
 
 function sanitize(value: string): string {

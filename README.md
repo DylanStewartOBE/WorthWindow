@@ -24,12 +24,19 @@ npm run dev
 ## Verify
 
 ```bash
-npm test
-npm run build
+npm run verify
 npm run sample:pdf
 ```
 
 Sample PDFs are generated into `public/sample-outputs`.
+
+## Local Data
+
+Jobs, elevations, and revisions are stored on the current device in IndexedDB, with a localStorage fallback. The Output step can download a versioned JSON backup and restore it later. There is no cloud sync or account recovery yet.
+
+## Deployment
+
+The production build is a static PWA in `dist`. It requires HTTPS, SPA fallback routing, and no-cache headers for `/index.html` and `/sw.js`. See [Deployment Readiness](docs/DEPLOYMENT_READINESS.md) for the private-beta and paid-release gates.
 
 ## V1 Scope
 

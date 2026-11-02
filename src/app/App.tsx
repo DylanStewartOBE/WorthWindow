@@ -6,12 +6,14 @@ import {
   ChevronRight,
   ClipboardCheck,
   Copy,
+  DatabaseBackup,
   DoorOpen,
   Droplets,
   Eye,
   EyeOff,
   FileDown,
   FileText,
+  FileUp,
   LayoutGrid,
   Ruler,
   Save,
@@ -66,13 +68,8 @@ import type {
   ValidationLibrary
 } from "../domain/types";
 import { createBlankElevationInput, createBlankJob, noDoorSeedInput, pairDoorSeedInput, seedJob } from "../data/seed";
-import { createRepository } from "../persistence/database";
-import {
-  downloadBlob,
-  generateJobDrawingPackagePdf,
-  generateJobQuotePdf,
-  pdfFileName
-} from "../pdf/pdfGenerator";
+import { createRepository, parseLocalSnapshot } from "../persistence/database";
+import { backupFileName, downloadBlob, pdfFileName } from "../pdf/fileUtilities";
 
 const steps = [
   { label: "Job", icon: FileText },
@@ -83,6 +80,8 @@ const steps = [
   { label: "Review", icon: ClipboardCheck },
   { label: "Output", icon: FileDown }
 ];
+
+const MAX_BACKUP_FILE_BYTES = 25 * 1024 * 1024;
 
 type ConfigState = {
   storefrontRulePack: StorefrontRulePack;
@@ -213,10 +212,11 @@ function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
   const [jobSetupMode, setJobSetupMode] = useState<JobSetupMode>("new");
   const [savedJobs, setSavedJobs] = useState<Job[]>([]);
   const [savedElevations, setSavedElevations] = useState<Elevation[]>([]);
-  const [, setStatus] = useState("Ready offline");
+  const [status, setStatus] = useState("Ready offline");
   const [adminMode, setAdminMode] = useState(() => isAdminModeEnabled());
   const [adminOpen, setAdminOpen] = useState(false);
   const [pdfUrls, setPdfUrls] = useState<{ package?: string; quote?: string }>({});
+  const [outputBusy, setOutputBusy] = useState(false);
   const [activeDoorSetIndex, setActiveDoorSetIndex] = useState(0);
   const [showAssemblyNumbers, setShowAssemblyNumbers] = useState(false);
   const [selectedAssemblyMark, setSelectedAssemblyMark] = useState<string | null>(null);
@@ -287,9 +287,12 @@ function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
   }, [calculationContext, repository]);
 
   useEffect(() => {
-    stepperRef.current
-      ?.querySelector<HTMLElement>(".step.active")
-      ?.scrollIntoView({ block: "nearest", inline: "center" });
+    const stepper = stepperRef.current;
+    const activeStepElement = stepper?.querySelector<HTMLElement>(".step.active");
+    if (!stepper || !activeStepElement) return;
+
+    const centeredLeft = activeStepElement.offsetLeft - (stepper.clientWidth - activeStepElement.offsetWidth) / 2;
+    stepper.scrollTo({ left: Math.max(centeredLeft, 0), behavior: "smooth" });
   }, [activeStep]);
 
   useEffect(() => {
@@ -863,51 +866,186 @@ function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
   };
 
   const saveRevision = async () => {
-    const existingRevisions = await repository.getRevisions(input.id).catch(() => []);
-    const nextRevision = getNextRevisionNumber(existingRevisions);
-    const calculated = { ...elevation, currentRevisionId: nextRevision };
-    const revision = createRevisionSnapshot(calculated, nextRevision);
-    const nextJob = normalizeJob({
-      ...job,
-      activeRevision: nextRevision,
-      activeElevationId: input.id,
-      status: "active",
-      elevationIds: unique([...job.elevationIds, input.id])
+    try {
+      const existingRevisions = await repository.getRevisions(input.id).catch(() => []);
+      const nextRevision = getNextRevisionNumber(existingRevisions);
+      const calculated = { ...elevation, currentRevisionId: nextRevision };
+      const revision = createRevisionSnapshot(calculated, nextRevision);
+      const nextJob = normalizeJob({
+        ...job,
+        activeRevision: nextRevision,
+        activeElevationId: input.id,
+        status: "active",
+        elevationIds: unique([...job.elevationIds, input.id])
+      });
+      await repository.saveJob(nextJob);
+      await repository.saveElevation(calculated);
+      await repository.saveRevision(revision);
+      setJob(nextJob);
+      setSavedJobs((current) => uniqueById([...current, nextJob]));
+      setSavedElevations((current) => uniqueById([...current, calculated]));
+      setStatus(`Saved revision ${nextRevision}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? `Revision not saved: ${error.message}` : "Revision could not be saved.");
+    }
+  };
+
+  const setPdfUrl = (type: "package" | "quote", url: string) => {
+    setPdfUrls((current) => {
+      const previousUrl = current[type];
+      if (previousUrl && previousUrl !== url) URL.revokeObjectURL(previousUrl);
+      return { ...current, [type]: url };
     });
-    await repository.saveJob(nextJob);
-    await repository.saveElevation(calculated);
-    await repository.saveRevision(revision);
-    setJob(nextJob);
-    setSavedJobs((current) => uniqueById([...current, nextJob]));
-    setSavedElevations((current) => uniqueById([...current, calculated]));
-    setStatus(`Saved revision ${nextRevision}`);
   };
 
-  const generatePdfs = () => {
-    const packageBlob = generateJobDrawingPackagePdf(jobElevations, job, config.branding, { showAssemblyNumbers });
-    const packageUrl = downloadBlob(packageBlob, pdfFileName(job, null, "package"));
-    setPdfUrls((current) => ({ ...current, package: packageUrl }));
-    setStatus("Job PDF package generated");
+  const clearPdfUrls = () => {
+    setPdfUrls((current) => {
+      for (const url of Object.values(current)) {
+        if (url) URL.revokeObjectURL(url);
+      }
+      return {};
+    });
   };
 
-  const generateQuote = () => {
-    const quoteBlob = generateJobQuotePdf(jobElevations, job, config.branding, config.quoteRulePack);
-    const quoteUrl = downloadBlob(quoteBlob, pdfFileName(job, null, "quote"));
-    setPdfUrls((current) => ({ ...current, quote: quoteUrl }));
-    setStatus("Job customer quote generated");
+  const generatePdfs = async () => {
+    setOutputBusy(true);
+    setStatus("Building drawing package...");
+    try {
+      const { generateJobDrawingPackagePdf } = await import("../pdf/pdfGenerator");
+      const packageBlob = generateJobDrawingPackagePdf(jobElevations, job, config.branding, { showAssemblyNumbers });
+      const packageUrl = downloadBlob(packageBlob, pdfFileName(job, null, "package"));
+      setPdfUrl("package", packageUrl);
+      setStatus("Job PDF package generated");
+    } catch (error) {
+      setStatus(error instanceof Error ? `PDF not generated: ${error.message}` : "PDF package could not be generated.");
+    } finally {
+      setOutputBusy(false);
+    }
+  };
+
+  const generateQuote = async () => {
+    setOutputBusy(true);
+    setStatus("Building customer quote...");
+    try {
+      const { generateJobQuotePdf } = await import("../pdf/pdfGenerator");
+      const quoteBlob = generateJobQuotePdf(jobElevations, job, config.branding, config.quoteRulePack);
+      const quoteUrl = downloadBlob(quoteBlob, pdfFileName(job, null, "quote"));
+      setPdfUrl("quote", quoteUrl);
+      setStatus("Job customer quote generated");
+    } catch (error) {
+      setStatus(error instanceof Error ? `Quote not generated: ${error.message}` : "Customer quote could not be generated.");
+    } finally {
+      setOutputBusy(false);
+    }
   };
 
   const sharePackage = async () => {
-    const packageBlob = generateJobDrawingPackagePdf(jobElevations, job, config.branding, { showAssemblyNumbers });
-    const files = [
-      new File([packageBlob], pdfFileName(job, null, "package"), { type: "application/pdf" })
-    ];
+    setOutputBusy(true);
+    setStatus("Preparing drawing package...");
+    try {
+      const { generateJobDrawingPackagePdf } = await import("../pdf/pdfGenerator");
+      const packageBlob = generateJobDrawingPackagePdf(jobElevations, job, config.branding, { showAssemblyNumbers });
+      const fileName = pdfFileName(job, null, "package");
+      const files = [new File([packageBlob], fileName, { type: "application/pdf" })];
 
-    if ("canShare" in navigator && navigator.canShare?.({ files })) {
-      await navigator.share({ title: `${job.number} drawing package`, files });
-      setStatus("Shared PDF package");
-    } else {
-      generatePdfs();
+      if ("canShare" in navigator && navigator.canShare?.({ files })) {
+        await navigator.share({ title: `${job.number} drawing package`, files });
+        setStatus("Shared PDF package");
+      } else {
+        const packageUrl = downloadBlob(packageBlob, fileName);
+        setPdfUrl("package", packageUrl);
+        setStatus("Sharing is unavailable here; the PDF was downloaded instead.");
+      }
+    } catch (error) {
+      if (error instanceof DOMException && error.name === "AbortError") {
+        setStatus("Share canceled");
+      } else {
+        setStatus(error instanceof Error ? `Package not shared: ${error.message}` : "Package could not be shared.");
+      }
+    } finally {
+      setOutputBusy(false);
+    }
+  };
+
+  const exportDataBackup = async () => {
+    setOutputBusy(true);
+    setStatus("Preparing local data backup...");
+    try {
+      const currentJob = normalizeJob({
+        ...job,
+        activeElevationId: input.id,
+        elevationIds: unique([...job.elevationIds, input.id])
+      });
+      await Promise.all([repository.saveJob(currentJob), repository.saveElevation(elevation)]);
+      const snapshot = { ...(await repository.exportSnapshot()), appVersion: __APP_VERSION__ };
+      const backupUrl = downloadBlob(
+        new Blob([JSON.stringify(snapshot, null, 2)], { type: "application/json" }),
+        backupFileName()
+      );
+      window.setTimeout(() => URL.revokeObjectURL(backupUrl), 30_000);
+      setJob(currentJob);
+      setSavedJobs((current) => uniqueById([...current, currentJob]));
+      setSavedElevations((current) => uniqueById([...current, elevation]));
+      setStatus(`Backup downloaded: ${snapshot.jobs.length} jobs, ${snapshot.elevations.length} elevations`);
+    } catch (error) {
+      setStatus(error instanceof Error ? `Backup failed: ${error.message}` : "Local data backup failed.");
+    } finally {
+      setOutputBusy(false);
+    }
+  };
+
+  const restoreDataBackup = async (file: File) => {
+    setOutputBusy(true);
+    setStatus("Checking backup...");
+    try {
+      if (file.size > MAX_BACKUP_FILE_BYTES) {
+        throw new Error("Backup is larger than the 25 MB restore limit.");
+      }
+
+      const snapshot = parseLocalSnapshot(JSON.parse(await file.text()));
+      const confirmed = window.confirm(
+        `Restore ${snapshot.jobs.length} jobs, ${snapshot.elevations.length} elevations, and ${snapshot.revisions.length} revisions? This replaces the local data currently stored on this device.`
+      );
+      if (!confirmed) {
+        setStatus("Backup restore canceled");
+        return;
+      }
+
+      await repository.replaceSnapshot(snapshot);
+      const normalizedJobs = snapshot.jobs.map(normalizeJob);
+      const nextJob = normalizedJobs.find((item) => item.status === "active") ?? normalizedJobs[0];
+      const nextElevation = nextJob
+        ? snapshot.elevations.find((item) => item.id === nextJob.activeElevationId) ??
+          snapshot.elevations.find((item) => item.jobId === nextJob.id)
+        : undefined;
+
+      setSavedJobs(normalizedJobs);
+      setSavedElevations(snapshot.elevations);
+      clearPdfUrls();
+      setActiveStep(0);
+
+      if (nextJob) {
+        setJob(nextJob);
+        setInput(nextElevation ? toInput(nextElevation) : createBlankElevationInput(nextJob.id, nextJob.createdBy));
+        setJobSetupMode("existing");
+      } else {
+        const blankJob = createBlankJob(job.createdBy || "Dylan Stewart");
+        const blankInput = createBlankElevationInput(blankJob.id, blankJob.createdBy);
+        const normalizedBlankJob = normalizeJob({
+          ...blankJob,
+          activeElevationId: blankInput.id,
+          elevationIds: [blankInput.id]
+        });
+        setJob(normalizedBlankJob);
+        setInput(blankInput);
+        setJobSetupMode("new");
+      }
+
+      setStatus(`Backup restored from ${file.name}`);
+    } catch (error) {
+      setStatus(error instanceof Error ? `Backup not restored: ${error.message}` : "Backup could not be restored.");
+    } finally {
+      setOutputBusy(false);
     }
   };
 
@@ -1055,7 +1193,10 @@ function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
               onShare={sharePackage}
               onSave={saveRevision}
               onDuplicate={duplicateElevation}
+              onExportBackup={exportDataBackup}
+              onRestoreBackup={restoreDataBackup}
               onLoadSample={loadSample}
+              busy={outputBusy}
               savedElevations={savedElevations}
             />
           )}
@@ -1086,6 +1227,10 @@ function WindowWallApp({ onBackToProducts }: { onBackToProducts: () => void }) {
           <ChevronLeft size={18} />
           Back
         </button>
+        <div className="nav-status" role="status" aria-live="polite">
+          <span>{status}</span>
+          <small>v{__APP_VERSION__}</small>
+        </div>
         <button className="primary-button" onClick={() => setActiveStep((step) => Math.min(step + 1, steps.length - 1))}>
           Next
           <ChevronRight size={18} />
@@ -2006,43 +2151,51 @@ function OutputStep({
   onShare,
   onSave,
   onDuplicate,
+  onExportBackup,
+  onRestoreBackup,
   onLoadSample,
+  busy,
   savedElevations
 }: {
   elevation: Elevation;
   job: Job;
   quotePresentation: QuotePresentation;
   pdfUrls: { package?: string; quote?: string };
-  onGenerate: () => void;
-  onGenerateQuote: () => void;
-  onShare: () => void;
-  onSave: () => void;
+  onGenerate: () => void | Promise<void>;
+  onGenerateQuote: () => void | Promise<void>;
+  onShare: () => void | Promise<void>;
+  onSave: () => void | Promise<void>;
   onDuplicate: () => void;
+  onExportBackup: () => void | Promise<void>;
+  onRestoreBackup: (file: File) => void | Promise<void>;
   onLoadSample: (sample: ElevationInput) => void;
+  busy: boolean;
   savedElevations: Elevation[];
 }) {
+  const backupInputRef = useRef<HTMLInputElement | null>(null);
+
   return (
     <section className="step-content">
       <SectionTitle title="Output" subtitle="PDF package and revisions" />
       <QuoteSummaryPanel presentation={quotePresentation} />
       <div className="button-stack">
-        <button className="primary-button wide" onClick={onGenerate}>
+        <button className="primary-button wide" onClick={onGenerate} disabled={busy}>
           <FileDown size={18} />
           Generate PDF package
         </button>
-        <button className="secondary-button wide" onClick={onGenerateQuote}>
+        <button className="secondary-button wide" onClick={onGenerateQuote} disabled={busy}>
           <FileText size={18} />
           Generate customer quote
         </button>
-        <button className="secondary-button wide" onClick={onShare}>
+        <button className="secondary-button wide" onClick={onShare} disabled={busy}>
           <Share2 size={18} />
           Share / export
         </button>
-        <button className="secondary-button wide" onClick={onSave}>
+        <button className="secondary-button wide" onClick={onSave} disabled={busy}>
           <Save size={18} />
           Save revision
         </button>
-        <button className="secondary-button wide" onClick={onDuplicate}>
+        <button className="secondary-button wide" onClick={onDuplicate} disabled={busy}>
           <Copy size={18} />
           Duplicate elevation
         </button>
@@ -2059,6 +2212,28 @@ function OutputStep({
           <a href={pdfUrls.quote} target="_blank" rel="noreferrer">{pdfFileName(job, null, "quote")}</a>
         </div>
       )}
+      <div className="data-backup-actions">
+        <strong>Local data</strong>
+        <button className="secondary-button wide" onClick={onExportBackup} disabled={busy}>
+          <DatabaseBackup size={18} />
+          Download data backup
+        </button>
+        <button className="secondary-button wide" onClick={() => backupInputRef.current?.click()} disabled={busy}>
+          <FileUp size={18} />
+          Restore data backup
+        </button>
+        <input
+          ref={backupInputRef}
+          className="visually-hidden"
+          type="file"
+          accept=".json,application/json"
+          onChange={(event) => {
+            const file = event.currentTarget.files?.[0];
+            event.currentTarget.value = "";
+            if (file) void onRestoreBackup(file);
+          }}
+        />
+      </div>
       <div className="sample-actions">
         <button className="text-button" onClick={() => onLoadSample(pairDoorSeedInput)}>Load pair-door sample</button>
         <button className="text-button" onClick={() => onLoadSample(noDoorSeedInput)}>Load no-door sample</button>

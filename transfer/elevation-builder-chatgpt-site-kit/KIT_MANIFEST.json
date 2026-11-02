@@ -1,0 +1,16 @@
+{
+  "kitVersion": "1.0.0",
+  "sourceApplication": "fg-2000-field-measure-drawing-app",
+  "sourceApplicationVersion": "0.1.0",
+  "generatedAt": "2026-07-21T16:24:51.335Z",
+  "entryPoint": "source/src/transfer/elevationBuilder.ts",
+  "visualReference": "source/src/app/App.tsx",
+  "includedCapabilities": [
+    "React/SVG elevation and plan graphics",
+    "measurement, row, column, corner, knee-wall, and lite-split geometry",
+    "single and pair door options, glass, hardware, and thresholds",
+    "validation flags, glass take-off, metal take-off, and quote calculations",
+    "editable storefront, entrance, pricing, note, validation, and branding rule packs",
+    "optional PDF and device-local persistence source"
+  ]
+}

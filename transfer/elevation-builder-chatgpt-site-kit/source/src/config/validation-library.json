@@ -1,0 +1,108 @@
+{
+  "enabled": true,
+  "messages": {
+    "missing-measurements": {
+      "enabled": true,
+      "severity": "error",
+      "message": "One or more opening measurements are missing or invalid.",
+      "recommendation": "Enter bottom, center, and top widths plus left, center, and right heights."
+    },
+    "missing-layout": {
+      "enabled": true,
+      "severity": "error",
+      "message": "Rows and columns must be at least 1.",
+      "recommendation": "Set a positive row and column count."
+    },
+    "impossible-geometry": {
+      "enabled": true,
+      "severity": "error",
+      "message": "The selected geometry cannot be generated.",
+      "recommendation": "Check opening dimensions and door selection."
+    },
+    "door-too-wide": {
+      "enabled": true,
+      "severity": "error",
+      "message": "The selected door package is too wide for the measured opening.",
+      "recommendation": "Increase the opening width, reduce the door package, or revise the layout."
+    },
+    "door-too-tall": {
+      "enabled": true,
+      "severity": "error",
+      "message": "The selected door height exceeds available entrance height.",
+      "recommendation": "Verify the opening height or use a shorter entrance package."
+    },
+    "ada-clear-width": {
+      "enabled": true,
+      "severity": "warning",
+      "message": "Estimated clear opening may not satisfy common accessible clear width expectations.",
+      "recommendation": "Verify actual clear width, hinge type, stop, and local accessibility requirements."
+    },
+    "egress-swing": {
+      "enabled": true,
+      "severity": "info",
+      "message": "Inswing selected; egress direction may need review.",
+      "recommendation": "Confirm occupancy, egress path, and existing-building allowances."
+    },
+    "unsupported-hinge": {
+      "enabled": true,
+      "severity": "warning",
+      "message": "Selected hinge type is not supported by the active entrance rule pack.",
+      "recommendation": "Choose a supported hinge type or update the entrance rule pack."
+    },
+    "hardware-compatibility": {
+      "enabled": true,
+      "severity": "warning",
+      "message": "Selected hardware may not match the selected entrance type.",
+      "recommendation": "Review the entrance hardware notes before issuing the drawing package."
+    },
+    "short-transom": {
+      "enabled": true,
+      "severity": "info",
+      "message": "Remaining height exists above the door but no transom was generated.",
+      "recommendation": "Review row count and transom settings."
+    },
+    "unsupported-layout": {
+      "enabled": true,
+      "severity": "warning",
+      "message": "Door elevation has remaining width but not enough sidelite columns to model it cleanly.",
+      "recommendation": "Use at least two columns for door elevations, and three columns for centered sidelites."
+    },
+    "opening-too-wide": {
+      "enabled": true,
+      "severity": "warning",
+      "message": "Opening width exceeds the simple V1 rule-pack advisory limit.",
+      "recommendation": "Review mullion spacing, expansion needs, and approved shop drawing details."
+    },
+    "opening-too-tall": {
+      "enabled": true,
+      "severity": "warning",
+      "message": "Opening height exceeds the simple V1 rule-pack advisory limit.",
+      "recommendation": "Review structural and product limitations outside this field drawing tool."
+    },
+    "expansion-vertical-advisory": {
+      "enabled": true,
+      "severity": "info",
+      "message": "Wide elevation may require expansion vertical review.",
+      "recommendation": "Treat this as an advisory only; do not apply expansion logic to stack assembly without approved details."
+    },
+    "stack-expansion-advisory": {
+      "enabled": true,
+      "severity": "info",
+      "message": "Stack assembly selected; expansion vertical assumptions should not be applied automatically.",
+      "recommendation": "Use approved stack assembly details for expansion and movement conditions."
+    },
+    "existing-building-context": {
+      "enabled": true,
+      "severity": "info",
+      "message": "Replacement or alteration project selected.",
+      "recommendation": "Verify existing substrates, floor conditions, egress, and accessibility constraints."
+    },
+    "safety-glazing": {
+      "enabled": true,
+      "severity": "warning",
+      "message": "One or more lites are likely safety glazing locations.",
+      "recommendation": "Confirm tempered or laminated safety glazing requirements before ordering glass."
+    }
+  }
+}
+

@@ -1,0 +1,1046 @@
+import { describe, expect, it } from "vitest";
+import {
+  defaultEntranceRulePack,
+  defaultNoteLibrary,
+  defaultQuoteRulePack,
+  defaultStorefrontRulePack,
+  defaultValidationLibrary
+} from "../src/config/options";
+import { calculateElevation, type CalculationContext } from "../src/domain/calculate";
+import { getDoorLeafVisuals } from "../src/domain/door";
+import {
+  getDoorGlassCalloutMap,
+  getGlassItemSquareFeet,
+  getGlassItemWeightPounds,
+  getGlassLineSquareFeet,
+  getGlassLineWeightPounds,
+  getTotalGlassSquareFeet,
+  getTotalGlassWeightPounds
+} from "../src/domain/glass";
+import { getDoorColumnIndex } from "../src/domain/geometry";
+import { createSquaredMeasurementSet, getGoverningDimensions } from "../src/domain/measurements";
+import { buildMetalTakeoff } from "../src/domain/metal";
+import { calculateQuoteSummary } from "../src/domain/quote";
+import { buildStorefrontQuotePresentation } from "../src/domain/quotePresentation";
+import { createRevisionSnapshot, getNextRevisionNumber } from "../src/domain/revision";
+import type { ElevationInput } from "../src/domain/types";
+import { noDoorSeedInput, pairDoorSeedInput, seedJob } from "../src/data/seed";
+
+const context: CalculationContext = {
+  storefrontRulePack: defaultStorefrontRulePack,
+  entranceRulePack: defaultEntranceRulePack,
+  noteLibrary: defaultNoteLibrary,
+  validationLibrary: defaultValidationLibrary
+};
+
+describe("FG-2000 calculation engine", () => {
+  it("stores squared estimating dimensions across the legacy measurement slots", () => {
+    const measurements = createSquaredMeasurementSet(93, 114);
+    const governing = getGoverningDimensions(measurements);
+
+    expect(measurements).toEqual({
+      widthBottom: 93,
+      widthCenter: 93,
+      widthTop: 93,
+      heightLeft: 114,
+      heightCenter: 114,
+      heightRight: 114
+    });
+    expect(governing.openingWidthMeasured).toBe(93);
+    expect(governing.openingHeightMeasured).toBe(114);
+  });
+
+  it("still accepts legacy three-point measurements and selects the smallest values", () => {
+    const governing = getGoverningDimensions({
+      widthBottom: 180,
+      widthCenter: 179.75,
+      widthTop: 180.125,
+      heightLeft: 108,
+      heightCenter: 107.875,
+      heightRight: 108.125
+    });
+
+    expect(governing.openingWidthMeasured).toBe(179.75);
+    expect(governing.governingWidthSource).toBe("widthCenter");
+    expect(governing.openingHeightMeasured).toBe(107.875);
+    expect(governing.governingHeightSource).toBe("heightCenter");
+  });
+
+  it("deducts perimeter joints for no-door frame width and height", () => {
+    const elevation = calculateElevation(noDoorSeedInput, context);
+
+    expect(elevation.computedGeometry.frameWidth).toBeCloseTo(143.375);
+    expect(elevation.computedGeometry.frameHeight).toBeCloseTo(95.375);
+    expect(elevation.computedGeometry.subsillWidth).toBeCloseTo(143.625);
+  });
+
+  it("calculates entrance sidelite subsill widths from door jamb to perimeter", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+
+    expect(elevation.computedGeometry.memberCalcs.leftSideliteSubsillWidth).toBeCloseTo(52.875);
+    expect(elevation.computedGeometry.memberCalcs.rightSideliteSubsillWidth).toBeCloseTo(52.875);
+  });
+
+  it("calculates mullion height from frame height less subsill height", () => {
+    const elevation = calculateElevation(noDoorSeedInput, context);
+
+    expect(elevation.computedGeometry.memberCalcs.mullionHeight).toBeCloseTo(94.875);
+  });
+
+  it("sets horizontal length from DLO and glass stop length from DLO less 1/16 inch", () => {
+    const elevation = calculateElevation(noDoorSeedInput, context);
+    const firstLite = elevation.computedGeometry.lites[0];
+
+    expect(elevation.computedGeometry.memberCalcs.typicalHorizontalLength).toBe(firstLite.dloWidth);
+    expect(elevation.computedGeometry.memberCalcs.typicalHorizontalGlassStopLength).toBeCloseTo(
+      firstLite.dloWidth - 0.0625
+    );
+  });
+
+  it("converts DLO to final glass size with the configured 5/8 inch add", () => {
+    const elevation = calculateElevation(noDoorSeedInput, context);
+    const firstLite = elevation.computedGeometry.lites[0];
+
+    expect(firstLite.glassWidth).toBeCloseTo(firstLite.dloWidth + 0.625);
+    expect(firstLite.glassHeight).toBeCloseTo(firstLite.dloHeight + 0.625);
+  });
+
+  it("derives storefront glass size from configured bite per side", () => {
+    const storefrontRulePack = structuredClone(defaultStorefrontRulePack);
+    storefrontRulePack.perimeterJoints = { head: 0, sill: 0, leftJamb: 0, rightJamb: 0 };
+    storefrontRulePack.sightlines = {
+      leftJamb: 2,
+      rightJamb: 2,
+      verticalMullion: 2,
+      doorJamb: 2,
+      head: 2,
+      sill: 2,
+      horizontalMullion: 2
+    };
+    storefrontRulePack.defaultSubsillId = "test-flat";
+    storefrontRulePack.subsillOptions["test-flat"] = { label: "Flat test sill", height: 0 };
+    storefrontRulePack.glassBite = {
+      leftJamb: 0.25,
+      rightJamb: 0.375,
+      verticalMullion: 0.3125,
+      doorJamb: 0.5,
+      head: 0.25,
+      sill: 0.375,
+      horizontalMullion: 0.3125
+    };
+
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        measurementSet: createSquaredMeasurementSet(120, 120),
+        rows: 2,
+        columns: 2
+      },
+      { ...context, storefrontRulePack }
+    );
+    const firstLite = elevation.computedGeometry.lites[0];
+
+    expect(firstLite.glassWidth).toBeCloseTo(firstLite.dloWidth + storefrontRulePack.glassBite.leftJamb + storefrontRulePack.glassBite.verticalMullion);
+    expect(firstLite.glassHeight).toBeCloseTo(firstLite.dloHeight + storefrontRulePack.glassBite.sill + storefrontRulePack.glassBite.horizontalMullion);
+    expect(new Set(elevation.computedGeometry.lites.map((lite) => lite.glassWidth))).toEqual(new Set([57.625]));
+    expect(new Set(elevation.computedGeometry.lites.map((lite) => lite.glassHeight))).toEqual(new Set([57.625]));
+  });
+
+  it("calculates line and total square footage for the glass takeoff", () => {
+    expect(getGlassItemSquareFeet({ width: 24, height: 36, qty: 2 })).toBe(6);
+    expect(getGlassLineSquareFeet({ width: 24, height: 36, qty: 2 })).toBe(12);
+    expect(
+      getTotalGlassSquareFeet([
+        { width: 24, height: 36, qty: 2 },
+        { width: 12, height: 24, qty: 1 }
+      ])
+    ).toBe(14);
+  });
+
+  it("calculates piece and total glass weights from square footage", () => {
+    const item = { width: 24, height: 36, qty: 2 };
+
+    expect(getGlassItemWeightPounds(item)).toBe(19.62);
+    expect(getGlassLineWeightPounds(item)).toBe(39.24);
+    expect(getTotalGlassWeightPounds([item])).toBe(39.24);
+  });
+
+  it("calculates customer quote from opening square footage and door adders", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+    const quote = calculateQuoteSummary(elevation, defaultQuoteRulePack);
+
+    expect(quote.pricingProfileName).toBe("Worth Baseline Quote Pricing");
+    expect(quote.pricingProfileVersion).toBe("0.1.0");
+    expect(quote.openingSquareFeet).toBe(134.66);
+    expect(quote.doorOpeningSquareFeet).toBe(42);
+    expect(quote.quotedStorefrontSquareFeet).toBe(92.66);
+    expect(quote.glassSquareFeet).toBe(110.73);
+    expect(quote.glassCost).toBe(1384.13);
+    expect(quote.aluminumLinearFeet).toBe(72.94);
+    expect(quote.aluminumCost).toBe(565.29);
+    expect(quote.highHeavyGlassSquareFeet).toBe(58.42);
+    expect(quote.highHeavyGlassPremiumCost).toBe(584.2);
+    expect(quote.lowHeavyGlassSquareFeet).toBe(0);
+    expect(quote.singleDoorCount).toBe(0);
+    expect(quote.pairDoorCount).toBe(1);
+    expect(quote.doorCost).toBe(4500);
+    expect(quote.subtotal).toBe(7033.62);
+    expect(quote.marginAmount).toBe(0);
+    expect(quote.total).toBe(7033.62);
+  });
+
+  it("calculates customer quote totals from the supplied quote rule pack", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+    const quoteRulePack = structuredClone(defaultQuoteRulePack);
+    quoteRulePack.name = "Test Pricing";
+    quoteRulePack.version = "99.0.0";
+    quoteRulePack.rates = {
+      glassPerSquareFoot: 1,
+      aluminumPerLinearFoot: 2,
+      highHeavyGlassPremiumPerSquareFoot: 3,
+      lowHeavyGlassPremiumPerSquareFoot: 4,
+      singleDoorAdder: 100,
+      pairDoorAdder: 200
+    };
+    quoteRulePack.margin.percent = 10;
+
+    const quote = calculateQuoteSummary(elevation, quoteRulePack);
+
+    expect(quote.pricingProfileName).toBe("Test Pricing");
+    expect(quote.pricingProfileVersion).toBe("99.0.0");
+    expect(quote.glassCost).toBe(110.73);
+    expect(quote.aluminumCost).toBe(145.88);
+    expect(quote.highHeavyGlassPremiumCost).toBe(175.26);
+    expect(quote.doorCost).toBe(200);
+    expect(quote.subtotal).toBe(631.87);
+    expect(quote.marginAmount).toBe(63.19);
+    expect(quote.total).toBe(695.06);
+  });
+
+  it("builds shared quote presentation rows from the same summary used by PDF and UI", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+    const quote = calculateQuoteSummary(elevation, defaultQuoteRulePack);
+    const presentation = buildStorefrontQuotePresentation([elevation], seedJob, defaultQuoteRulePack);
+    const rowsById = new Map(presentation.outputRows.map((row) => [row.id, row]));
+
+    expect(presentation.pricingProfile.displayName).toBe("Worth Baseline Quote Pricing v0.1.0");
+    expect(presentation.totals.total).toBe(quote.total);
+    expect(presentation.totals.totalDisplay).toBe("$7,033.62");
+    expect(rowsById.get("job")?.value).toBe("WC-2000 Worth Construction Demo Storefront");
+    expect(rowsById.get("scope")?.value).toBe("E1 Pair doors with sidelites");
+    expect(rowsById.get("glass-total")).toMatchObject({ value: "$1,384.13", amount: quote.glassCost });
+    expect(rowsById.get("aluminum-total")).toMatchObject({ value: "$565.29", amount: quote.aluminumCost });
+    expect(rowsById.get("door-total")).toMatchObject({ value: "$4,500.00", amount: quote.doorCost });
+    expect(presentation.outputRows.every((row) => row.customerVisible)).toBe(true);
+    expect(presentation.internalRows.some((row) => row.id === "pricing-profile-id" && !row.customerVisible)).toBe(true);
+    expect(presentation.exclusions[0]).toContain("Quote excludes engineering");
+  });
+
+  it("groups generated storefront members into a metal takeoff", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+    const takeoff = buildMetalTakeoff([elevation]);
+
+    expect(takeoff.totalLinearFeet).toBe(72.94);
+    expect(takeoff.items.map((item) => item.role)).toEqual([
+      "jamb",
+      "door-jamb",
+      "head",
+      "sill",
+      "horizontal-mullion"
+    ]);
+    expect(takeoff.items.find((item) => item.role === "jamb")).toMatchObject({
+      label: "Jamb",
+      qty: 2,
+      totalLinearFeet: 17.94,
+      elevationBreakdown: [{ label: "E1", qty: 2 }]
+    });
+    expect(takeoff.items.find((item) => item.role === "door-jamb")).toMatchObject({
+      qty: 2,
+      totalLinearFeet: 17.94,
+      elevationBreakdown: [{ label: "E1", qty: 2 }]
+    });
+  });
+
+  it("shortens bottom-row glass where a knee-wall is added", () => {
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        kneeWalls: [{ columnIndex: 0, height: 16 }]
+      },
+      context
+    );
+    const bottomLeftLite = elevation.computedGeometry.lites.find((lite) => lite.rowIndex === 0 && lite.columnIndex === 0);
+
+    expect(elevation.computedGeometry.kneeWalls).toMatchObject([
+      { columnIndex: 0, height: 16 }
+    ]);
+    expect(elevation.computedGeometry.members.find((member) => member.id === "member-left-jamb")).toMatchObject({
+      y: 16,
+      height: 79.375
+    });
+    expect(bottomLeftLite?.height).toBeCloseTo(31.688);
+    expect(bottomLeftLite?.dloY).toBeCloseTo(17.75);
+    expect(bottomLeftLite?.glassHeight).toBe(29.6875);
+    expect(elevation.computedGlass.items.map((item) => ({ mark: item.mark, qty: item.qty, height: item.height }))).toEqual([
+      { mark: "G1", qty: 1, height: 29.6875 },
+      { mark: "G2", qty: 3, height: 45.6875 }
+    ]);
+  });
+
+  it("stops a corner mullion at the raised sill when the edge assembly has a knee-wall", () => {
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        columns: 3,
+        cornerConfig: {
+          hasCorner: true,
+          side: "right",
+          angle: 90,
+          condition: "outside"
+        },
+        kneeWalls: [{ columnIndex: 2, height: 16 }]
+      },
+      context
+    );
+    const corner = elevation.computedGeometry.members.find((member) => member.role === "corner");
+
+    expect(corner).toMatchObject({
+      y: 16,
+      height: 79.375
+    });
+  });
+
+  it("stops intermediate mullions at the top of a continuous knee-wall run", () => {
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        columns: 3,
+        kneeWalls: [
+          { columnIndex: 0, height: 16 },
+          { columnIndex: 1, height: 16 }
+        ]
+      },
+      context
+    );
+    const mullionBetweenKneeWalls = elevation.computedGeometry.members.find((member) => member.id === "member-v-1");
+    const mullionAfterKneeWallRun = elevation.computedGeometry.members.find((member) => member.id === "member-v-2");
+
+    expect(mullionBetweenKneeWalls).toMatchObject({
+      y: 16,
+      height: 79.375
+    });
+    expect(mullionAfterKneeWallRun).toMatchObject({
+      y: 0,
+      height: 95.375
+    });
+  });
+
+  it("can split a selected bottom-row lite vertically without changing the top row", () => {
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        columns: 3,
+        liteSplits: [{ rowIndex: 0, columnIndex: 1, orientation: "vertical", count: 2 }]
+      },
+      context
+    );
+    const bottomA2Lites = elevation.computedGeometry.lites.filter(
+      (lite) => lite.rowIndex === 0 && lite.columnIndex === 1
+    );
+    const topA2Lites = elevation.computedGeometry.lites.filter(
+      (lite) => lite.rowIndex === 1 && lite.columnIndex === 1
+    );
+    const splitMember = elevation.computedGeometry.members.find((member) => member.id === "member-lite-split-v-r1-c2-1");
+
+    expect(bottomA2Lites).toHaveLength(2);
+    expect(new Set(bottomA2Lites.map((lite) => lite.glassWidth))).toEqual(new Set([22.5]));
+    expect(topA2Lites).toHaveLength(1);
+    expect(topA2Lites[0].glassWidth).toBe(46.0625);
+    expect(splitMember).toMatchObject({
+      role: "vertical-mullion",
+      y: 1.75,
+      width: 1.75,
+      height: 45.063
+    });
+    expect(elevation.computedGlass.items.find((item) => item.mark === "G2")).toMatchObject({
+      qty: 2,
+      width: 22.5,
+      location: "R1C2, R1C2"
+    });
+  });
+
+  it("can split a selected lite horizontally without moving adjacent row lines", () => {
+    const baseline = calculateElevation({ ...noDoorSeedInput, columns: 3 }, context);
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        columns: 3,
+        liteSplits: [{ rowIndex: 0, columnIndex: 1, orientation: "horizontal", count: 2 }]
+      },
+      context
+    );
+    const bottomA2Lites = elevation.computedGeometry.lites.filter(
+      (lite) => lite.rowIndex === 0 && lite.columnIndex === 1
+    );
+    const topA2Lites = elevation.computedGeometry.lites.filter(
+      (lite) => lite.rowIndex === 1 && lite.columnIndex === 1
+    );
+    const baselineTopA2Lite = baseline.computedGeometry.lites.find((lite) => lite.rowIndex === 1 && lite.columnIndex === 1);
+    const splitMember = elevation.computedGeometry.members.find((member) => member.id === "member-lite-split-h-r1-c2-1");
+
+    expect(bottomA2Lites).toHaveLength(2);
+    expect(new Set(bottomA2Lites.map((lite) => lite.glassWidth))).toEqual(new Set([46.0625]));
+    expect(new Set(bottomA2Lites.map((lite) => lite.glassHeight))).toEqual(new Set([22.3125]));
+    expect(topA2Lites).toHaveLength(1);
+    expect(topA2Lites[0].height).toBeCloseTo(baselineTopA2Lite?.height ?? 0);
+    expect(splitMember).toMatchObject({
+      role: "horizontal-mullion",
+      x: 48.958,
+      y: 23.407,
+      width: 45.458,
+      height: 1.75
+    });
+    expect(elevation.computedGlass.items.find((item) => item.mark === "G2")).toMatchObject({
+      qty: 2,
+      height: 22.3125,
+      location: "R1C2, R1C2"
+    });
+  });
+
+  it("uses the selected second row as the transom row above an 84 inch door", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+
+    expect(elevation.computedGeometry.transoms).toHaveLength(1);
+    expect(elevation.computedGeometry.transoms[0].height).toBeCloseTo(22.75);
+  });
+
+  it("keeps one-row sidelites full height while still generating a door transom", () => {
+    const elevation = calculateElevation(
+      {
+        ...pairDoorSeedInput,
+        rows: 1,
+        rowSizingMode: "equal",
+        rowHeights: [0]
+      },
+      context
+    );
+
+    expect(elevation.computedGeometry.rowHeights).toHaveLength(1);
+    expect(elevation.computedGeometry.transoms).toHaveLength(1);
+    expect(elevation.computedGeometry.transoms[0].height).toBeCloseTo(22.75);
+    expect(elevation.computedGeometry.doorOpenings[0].height).toBe(84);
+    expect(elevation.computedGeometry.lites).toHaveLength(3);
+    expect(elevation.computedGeometry.lites.filter((lite) => lite.type !== "transom").every((lite) => lite.rowIndex === 0)).toBe(true);
+    expect(elevation.computedGeometry.members.filter((member) => member.role === "horizontal-mullion")).toHaveLength(1);
+  });
+
+  it("distributes no-door equal mode by final glass size", () => {
+    const elevation = calculateElevation(noDoorSeedInput, context);
+    const glassWidths = new Set(elevation.computedGeometry.lites.map((lite) => lite.glassWidth));
+    const glassHeights = new Set(elevation.computedGeometry.lites.map((lite) => lite.glassHeight));
+
+    expect(glassWidths.size).toBe(1);
+    expect(glassHeights.size).toBe(1);
+    expect(elevation.computedGeometry.bays[0].width).toBeCloseTo(71.688);
+  });
+
+  it("omits entrance, swing, hinge, hardware, and threshold notes for no-door elevations", () => {
+    const elevation = calculateElevation(noDoorSeedInput, context);
+    const noteText = elevation.computedGeometry.notes.join("\n");
+
+    expect(noteText).not.toContain("Standard entrance package");
+    expect(noteText).not.toContain("Door swing:");
+    expect(noteText).not.toContain("Hinge:");
+    expect(noteText).not.toContain("Hardware note:");
+    expect(noteText).not.toContain("Threshold / transition:");
+  });
+
+  it("keeps selected entrance notes for door elevations", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+
+    expect(elevation.computedGeometry.notes).toEqual(
+      expect.arrayContaining([
+        "Standard entrance package is note-level only in V1; verify final entrance fabrication details with approved entrance documents.",
+        "Door swing: outswing.",
+        "Hinge: continuous gear hinge.",
+        "Hardware note: rim panic device.",
+        "Hardware note: closer required; surface or concealed as selected in final hardware set.",
+        "Hardware note: pull / push set.",
+        "Threshold / transition: standard accessible threshold, verify floor condition."
+      ])
+    );
+  });
+
+  it("adds a corner note when a return is configured", () => {
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        cornerConfig: {
+          hasCorner: true,
+          side: "left",
+          angle: 90,
+          condition: "outside",
+          linkedElevationId: "elev-return"
+        }
+      },
+      context
+    );
+
+    expect(elevation.computedGeometry.notes.some((note) => note.includes("outside left return"))).toBe(true);
+    expect(elevation.computedGeometry.notes.some((note) => note.includes("3.5 in"))).toBe(true);
+  });
+
+  it("keeps door openings clear of corner mullion sightlines", () => {
+    const elevation = calculateElevation(
+      {
+        ...pairDoorSeedInput,
+        doorConfig: {
+          ...pairDoorSeedInput.doorConfig,
+          doorType: "single",
+          widthPerLeaf: 36,
+          locationMode: "custom",
+          columnIndex: 0,
+          doorSetCount: 1,
+          doorSets: [
+            {
+              ...pairDoorSeedInput.doorConfig.doorSets[0],
+              doorType: "single",
+              widthPerLeaf: 36,
+              locationMode: "custom",
+              columnIndex: 0
+            }
+          ]
+        },
+        cornerConfig: {
+          hasCorner: true,
+          side: "left",
+          angle: 90,
+          condition: "outside"
+        }
+      },
+      context
+    );
+    const corner = elevation.computedGeometry.members.find((member) => member.role === "corner");
+    const door = elevation.computedGeometry.doorOpenings[0];
+
+    expect(corner?.width).toBeCloseTo(3.5);
+    expect(door.x).toBeCloseTo(3.5);
+  });
+
+  it("can preserve a source door-line row height on a no-door corner return", () => {
+    const source = calculateElevation(pairDoorSeedInput, context);
+    const matchingOpeningHeight =
+      source.computedGeometry.frameHeight +
+      defaultStorefrontRulePack.perimeterJoints.head +
+      defaultStorefrontRulePack.perimeterJoints.sill;
+    const returnElevation = calculateElevation(
+      {
+        ...pairDoorSeedInput,
+        measurementSet: createSquaredMeasurementSet(pairDoorSeedInput.measurementSet.widthCenter, matchingOpeningHeight),
+        rowSizingMode: "custom",
+        rowHeights: [source.computedGeometry.rowHeights[0], 0],
+        doorConfig: {
+          ...pairDoorSeedInput.doorConfig,
+          hasDoor: false,
+          doorType: "none",
+          columnIndex: null,
+          doorSetCount: 0,
+          doorSets: []
+        }
+      },
+      context
+    );
+
+    expect(returnElevation.computedGeometry.frameHeight).toBeCloseTo(source.computedGeometry.frameHeight);
+    expect(returnElevation.computedGeometry.rowHeights[0]).toBeCloseTo(source.computedGeometry.rowHeights[0]);
+  });
+
+  it("keeps one-row three-column no-door glass equal across jamb and mullion conditions", () => {
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        measurementSet: createSquaredMeasurementSet(180, 108),
+        rows: 1,
+        columns: 3
+      },
+      context
+    );
+    const glassWidths = new Set(elevation.computedGeometry.lites.map((lite) => lite.glassWidth));
+    const glassHeights = new Set(elevation.computedGeometry.lites.map((lite) => lite.glassHeight));
+
+    expect(elevation.computedGeometry.columnWidths[0]).toBeCloseTo(elevation.computedGeometry.columnWidths[2]);
+    expect(elevation.computedGeometry.columnWidths[0]).toBeGreaterThan(elevation.computedGeometry.columnWidths[1]);
+    expect(glassWidths).toEqual(new Set([58.125]));
+    expect(glassHeights.size).toBe(1);
+    expect(elevation.computedGlass.items).toHaveLength(1);
+    expect(elevation.computedGlass.items[0]).toMatchObject({
+      mark: "G1",
+      qty: 3,
+      location: "R1C1, R1C2, R1C3"
+    });
+  });
+
+  it("centers intermediate members on the layout line and derives DLO from member faces", () => {
+    const storefrontRulePack = structuredClone(defaultStorefrontRulePack);
+    storefrontRulePack.perimeterJoints = { head: 0, sill: 0, leftJamb: 0, rightJamb: 0 };
+    storefrontRulePack.sightlines = {
+      leftJamb: 2,
+      rightJamb: 2,
+      verticalMullion: 2,
+      doorJamb: 2,
+      head: 2,
+      sill: 2,
+      horizontalMullion: 2
+    };
+    storefrontRulePack.defaultSubsillId = "test-flat";
+    storefrontRulePack.subsillOptions["test-flat"] = { label: "Flat test sill", height: 0 };
+
+    const input: ElevationInput = {
+      ...noDoorSeedInput,
+      measurementSet: createSquaredMeasurementSet(120, 120),
+      rows: 2,
+      columns: 2
+    };
+    const elevation = calculateElevation(input, { ...context, storefrontRulePack });
+    const verticalMullion = elevation.computedGeometry.members.find((member) => member.role === "vertical-mullion");
+    const horizontalMullion = elevation.computedGeometry.members.find((member) => member.role === "horizontal-mullion");
+    const firstLite = elevation.computedGeometry.lites[0];
+
+    expect(verticalMullion?.x).toBeCloseTo(59);
+    expect(verticalMullion?.width).toBe(2);
+    expect(horizontalMullion?.y).toBeCloseTo(59);
+    expect(horizontalMullion?.height).toBe(2);
+    expect(firstLite.dloWidth).toBeCloseTo(57);
+    expect(firstLite.dloHeight).toBeCloseTo(57);
+  });
+
+  it("distributes custom remainder into any unset rows and columns", () => {
+    const storefrontRulePack = structuredClone(defaultStorefrontRulePack);
+    storefrontRulePack.perimeterJoints = { head: 0, sill: 0, leftJamb: 0, rightJamb: 0 };
+    storefrontRulePack.sightlines = {
+      leftJamb: 2,
+      rightJamb: 2,
+      verticalMullion: 2,
+      doorJamb: 2,
+      head: 2,
+      sill: 2,
+      horizontalMullion: 2
+    };
+    storefrontRulePack.defaultSubsillId = "test-flat";
+    storefrontRulePack.subsillOptions["test-flat"] = { label: "Flat test sill", height: 0 };
+
+    const elevation = calculateElevation(
+      {
+        ...noDoorSeedInput,
+        measurementSet: createSquaredMeasurementSet(120, 120),
+        columns: 3,
+        rows: 2,
+        columnSizingMode: "custom",
+        rowSizingMode: "custom",
+        columnWidths: [30, 50, 0],
+        rowHeights: [40, 0]
+      },
+      { ...context, storefrontRulePack }
+    );
+
+    expect(elevation.computedGeometry.columnWidths).toEqual([30, 50, 40]);
+    expect(elevation.computedGeometry.rowHeights).toEqual([40, 80]);
+    expect(elevation.computedGeometry.lites[0].dloWidth).toBeCloseTo(27);
+    expect(elevation.computedGeometry.lites[0].dloHeight).toBeCloseTo(37);
+  });
+
+  it("keeps the door column driven and distributes the remaining custom storefront columns", () => {
+    const storefrontRulePack = structuredClone(defaultStorefrontRulePack);
+    storefrontRulePack.perimeterJoints = { head: 0, sill: 0, leftJamb: 0, rightJamb: 0 };
+    storefrontRulePack.sightlines = {
+      leftJamb: 2,
+      rightJamb: 2,
+      verticalMullion: 2,
+      doorJamb: 2,
+      head: 2,
+      sill: 2,
+      horizontalMullion: 2
+    };
+    storefrontRulePack.defaultSubsillId = "test-flat";
+    storefrontRulePack.subsillOptions["test-flat"] = { label: "Flat test sill", height: 0 };
+
+    const elevation = calculateElevation(
+      {
+        ...pairDoorSeedInput,
+        measurementSet: createSquaredMeasurementSet(120, 120),
+        columns: 4,
+        columnSizingMode: "custom",
+        columnWidths: [30, 999, 0, 0],
+        doorConfig: {
+          ...pairDoorSeedInput.doorConfig,
+          doorType: "single",
+          widthPerLeaf: 36,
+          locationMode: "custom",
+          columnIndex: 1
+        }
+      },
+      { ...context, storefrontRulePack }
+    );
+
+    expect(elevation.computedGeometry.columnWidths).toEqual([30, 38, 26, 26]);
+    expect(elevation.computedGeometry.doorOpenings[0].width).toBe(36);
+  });
+
+  it("locks the transom line to the door height and moves only the rows above it", () => {
+    const storefrontRulePack = structuredClone(defaultStorefrontRulePack);
+    storefrontRulePack.perimeterJoints = { head: 0, sill: 0, leftJamb: 0, rightJamb: 0 };
+    storefrontRulePack.sightlines = {
+      leftJamb: 2,
+      rightJamb: 2,
+      verticalMullion: 2,
+      doorJamb: 2,
+      head: 2,
+      sill: 2,
+      horizontalMullion: 2
+    };
+    storefrontRulePack.defaultSubsillId = "test-flat";
+    storefrontRulePack.subsillOptions["test-flat"] = { label: "Flat test sill", height: 0 };
+
+    const elevation = calculateElevation(
+      {
+        ...pairDoorSeedInput,
+        measurementSet: createSquaredMeasurementSet(120, 120),
+        rows: 3,
+        rowSizingMode: "custom",
+        rowHeights: [999, 10, 0],
+        doorConfig: {
+          ...pairDoorSeedInput.doorConfig,
+          rowPlacement: "above"
+        }
+      },
+      { ...context, storefrontRulePack }
+    );
+
+    expect(elevation.computedGeometry.rowHeights).toEqual([85, 10, 25]);
+    expect(elevation.computedGeometry.doorOpenings[0].height).toBe(84);
+  });
+
+  it("can place extra rows below the door line while keeping the transom row driven", () => {
+    const storefrontRulePack = structuredClone(defaultStorefrontRulePack);
+    storefrontRulePack.perimeterJoints = { head: 0, sill: 0, leftJamb: 0, rightJamb: 0 };
+    storefrontRulePack.sightlines = {
+      leftJamb: 2,
+      rightJamb: 2,
+      verticalMullion: 2,
+      doorJamb: 2,
+      head: 2,
+      sill: 2,
+      horizontalMullion: 2
+    };
+    storefrontRulePack.defaultSubsillId = "test-flat";
+    storefrontRulePack.subsillOptions["test-flat"] = { label: "Flat test sill", height: 0 };
+
+    const elevation = calculateElevation(
+      {
+        ...pairDoorSeedInput,
+        measurementSet: createSquaredMeasurementSet(120, 120),
+        rows: 3,
+        rowSizingMode: "equal",
+        doorConfig: {
+          ...pairDoorSeedInput.doorConfig,
+          rowPlacement: "below"
+        }
+      },
+      { ...context, storefrontRulePack }
+    );
+    const doorColumn = elevation.computedGeometry.doorOpenings[0].columnIndex;
+    const doorColumnBays = elevation.computedGeometry.bays.filter((bay) => bay.columnIndex === doorColumn);
+    const leftColumnBays = elevation.computedGeometry.bays.filter((bay) => bay.columnIndex === 0);
+
+    expect(elevation.computedGeometry.rowHeights).toEqual([42.5, 42.5, 35]);
+    expect(doorColumnBays.map((bay) => bay.rowIndex)).toEqual([0, 2]);
+    expect(leftColumnBays.map((bay) => bay.rowIndex)).toEqual([0, 1, 2]);
+    expect(elevation.computedGeometry.doorOpenings[0].height).toBe(84);
+  });
+
+  it("places single and pair doors deterministically", () => {
+    const singleInput: ElevationInput = {
+      ...pairDoorSeedInput,
+      doorConfig: { ...pairDoorSeedInput.doorConfig, doorType: "single", widthPerLeaf: 36, locationMode: "center" }
+    };
+    const pair = calculateElevation(pairDoorSeedInput, context).computedGeometry.doorOpenings[0];
+    const singleGeometry = calculateElevation(singleInput, context).computedGeometry;
+    const single = singleGeometry.doorOpenings[0];
+    const shiftedRightGeometry = calculateElevation(
+      { ...singleInput, doorConfig: { ...singleInput.doorConfig, locationMode: "right", columnIndex: 2 } },
+      context
+    ).computedGeometry;
+    const shiftedRight = shiftedRightGeometry.doorOpenings[0];
+
+    expect(getDoorColumnIndex(3, "center")).toBe(1);
+    expect(pair.width).toBe(72);
+    expect(pair.x).toBeCloseTo(53.625);
+    expect(single.width).toBe(36);
+    expect(single.columnIndex).toBe(1);
+    expect(single.x).toBeCloseTo(71.625);
+    expect(singleGeometry.columnWidths).toEqual([70.75, 37.75, 70.75]);
+    expect(shiftedRight.columnIndex).toBe(2);
+    expect(shiftedRight.x).toBeCloseTo(141.5);
+    expect(shiftedRightGeometry.columnWidths).toEqual([70.75, 69.875, 38.625]);
+    const shiftedRightBottomLites = shiftedRightGeometry.lites.filter((lite) => lite.rowIndex === 0);
+    expect(shiftedRightBottomLites[0].glassWidth).toBeCloseTo(shiftedRightBottomLites[1].glassWidth);
+    expect(shiftedRightBottomLites[0].mark).toBe(shiftedRightBottomLites[1].mark);
+  });
+
+  it("locks an off-center single door bay and equalizes the remaining glass widths", () => {
+    const storefrontRulePack = structuredClone(defaultStorefrontRulePack);
+    storefrontRulePack.perimeterJoints = { head: 0, sill: 0, leftJamb: 0, rightJamb: 0 };
+    storefrontRulePack.sightlines = {
+      leftJamb: 2,
+      rightJamb: 2,
+      verticalMullion: 2,
+      doorJamb: 2,
+      head: 2,
+      sill: 2,
+      horizontalMullion: 2
+    };
+    storefrontRulePack.defaultSubsillId = "test-flat";
+    storefrontRulePack.subsillOptions["test-flat"] = { label: "Flat test sill", height: 0 };
+
+    const elevation = calculateElevation(
+      {
+        ...pairDoorSeedInput,
+        measurementSet: createSquaredMeasurementSet(120, 120),
+        rows: 2,
+        columns: 4,
+        columnSizingMode: "equal",
+        columnWidths: [1, 1, 1, 1],
+        doorConfig: {
+          ...pairDoorSeedInput.doorConfig,
+          doorType: "single",
+          widthPerLeaf: 36,
+          locationMode: "custom",
+          columnIndex: 1
+        }
+      },
+      { ...context, storefrontRulePack }
+    );
+    const [bay1, bay2, bay3, bay4] = elevation.computedGeometry.columnWidths;
+    const door = elevation.computedGeometry.doorOpenings[0];
+    const nonDoorBottomLites = elevation.computedGeometry.lites.filter((lite) => lite.rowIndex === 0);
+
+    expect(bay1).toBeCloseTo(27.667);
+    expect(bay2).toBeCloseTo(38);
+    expect(bay3).toBeCloseTo(26.667);
+    expect(bay4).toBeCloseTo(27.666);
+    expect(door.x).toBeCloseTo(28.667);
+    expect(door.width).toBe(36);
+    expect(nonDoorBottomLites).toHaveLength(3);
+    expect(new Set(nonDoorBottomLites.map((lite) => lite.glassWidth))).toEqual(new Set([25.3125]));
+    expect(new Set(nonDoorBottomLites.map((lite) => lite.mark))).toEqual(new Set(["G1"]));
+  });
+
+  it("groups equal off-center single-door glass under one tag on the long side", () => {
+    const elevation = calculateElevation(
+      {
+        ...pairDoorSeedInput,
+        columns: 5,
+        columnSizingMode: "equal",
+        columnWidths: [1, 1, 1, 1, 1],
+        doorConfig: {
+          ...pairDoorSeedInput.doorConfig,
+          doorType: "single",
+          widthPerLeaf: 36,
+          locationMode: "custom",
+          columnIndex: 1
+        }
+      },
+      context
+    );
+    const rightBottomLites = elevation.computedGeometry.lites.filter((lite) => lite.rowIndex === 0 && lite.columnIndex >= 2);
+    const rightTopLites = elevation.computedGeometry.lites.filter(
+      (lite) => lite.rowIndex === 1 && lite.columnIndex >= 2 && lite.type !== "transom"
+    );
+
+    expect(new Set(rightBottomLites.map((lite) => lite.mark)).size).toBe(1);
+    expect(new Set(rightTopLites.map((lite) => lite.mark)).size).toBe(1);
+    expect(new Set(rightBottomLites.map((lite) => lite.glassWidth))).toEqual(new Set([33.8125]));
+    expect(new Set(rightTopLites.map((lite) => lite.glassWidth))).toEqual(new Set([33.8125]));
+  });
+
+  it("keeps the short side glass equal to the long side when a single door is off center", () => {
+    const elevation = calculateElevation(
+      {
+        ...pairDoorSeedInput,
+        columns: 5,
+        columnSizingMode: "equal",
+        columnWidths: [1, 1, 1, 1, 1],
+        kneeWalls: [{ columnIndex: 0, height: 16 }],
+        doorConfig: {
+          ...pairDoorSeedInput.doorConfig,
+          doorType: "single",
+          widthPerLeaf: 36,
+          locationMode: "custom",
+          columnIndex: 3,
+          doorSetCount: 1,
+          doorSets: [
+            {
+              ...pairDoorSeedInput.doorConfig.doorSets[0],
+              doorType: "single",
+              widthPerLeaf: 36,
+              locationMode: "custom",
+              columnIndex: 3
+            }
+          ]
+        }
+      },
+      context
+    );
+
+    expect(elevation.computedGlass.items.find((item) => item.mark === "G1")).toMatchObject({
+      qty: 1,
+      location: "R1C1",
+      width: 33.8125,
+      height: 66.875
+    });
+    expect(elevation.computedGlass.items.find((item) => item.mark === "G3")).toMatchObject({
+      qty: 3,
+      location: "R1C2, R1C3, R1C5",
+      width: 33.8125,
+      height: 82.875
+    });
+  });
+
+  it("draws door guide lines from the latch-side corners to the hinge-side midpoint", () => {
+    const singleLeaf = getDoorLeafVisuals({ width: 36, height: 84, leafCount: 1 })[0];
+    const pairLeaves = getDoorLeafVisuals({ width: 72, height: 84, leafCount: 2 });
+
+    expect(singleLeaf.members).toEqual([
+      { role: "left-stile", x: 0, y: 0, width: 4, height: 84 },
+      { role: "right-stile", x: 32, y: 0, width: 4, height: 84 },
+      { role: "top-rail", x: 4, y: 0, width: 28, height: 4 },
+      { role: "bottom-rail", x: 4, y: 74, width: 28, height: 10 }
+    ]);
+    expect(singleLeaf.guideStartTop).toEqual({ x: 36, y: 0 });
+    expect(singleLeaf.guideStartBottom).toEqual({ x: 36, y: 84 });
+    expect(singleLeaf.guideEnd).toEqual({ x: 0, y: 42 });
+
+    expect(pairLeaves[0].guideStartTop).toEqual({ x: 36, y: 0 });
+    expect(pairLeaves[0].guideEnd).toEqual({ x: 0, y: 42 });
+    expect(pairLeaves[1].guideStartTop).toEqual({ x: 36, y: 0 });
+    expect(pairLeaves[1].guideEnd).toEqual({ x: 72, y: 42 });
+  });
+
+  it("includes door leaf glass on the glass takeoff", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+    const doorGlass = elevation.computedGlass.items.find((item) => item.sourceType === "door-lite");
+    const doorCallouts = getDoorGlassCalloutMap(elevation.computedGlass.items);
+
+    expect(doorGlass).toMatchObject({
+      mark: "DG1",
+      qty: 2,
+      width: 28,
+      height: 70,
+      safetyGlazingLikely: true,
+      sourceType: "door-lite"
+    });
+    expect(doorGlass?.location).toBe("D1L1, D1L2");
+    expect(doorCallouts).toEqual({
+      D1L1: { mark: "DG1", width: 28, height: 70 },
+      D1L2: { mark: "DG1", width: 28, height: 70 }
+    });
+  });
+
+  it("numbers column, door, and sub-assemblies deterministically", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+    const callouts = elevation.computedGeometry.assemblyCallouts;
+
+    expect(callouts.filter((callout) => callout.type === "column").map((callout) => callout.mark)).toEqual([
+      "A1",
+      "A2",
+      "A3"
+    ]);
+    expect(callouts.filter((callout) => callout.type === "door").map((callout) => callout.mark)).toEqual(["DA1"]);
+    expect(callouts.filter((callout) => callout.level === "subassembly").map((callout) => callout.mark)).toEqual([
+      "SA1",
+      "SA2",
+      "SA3",
+      "SA4",
+      "SA5",
+      "SA6",
+      "SA7"
+    ]);
+    expect(callouts.find((callout) => callout.type === "transom")?.parentMark).toBe("DA1");
+  });
+
+  it("reuses the same storefront tag for equal-size lites", () => {
+    const elevation = calculateElevation(noDoorSeedInput, context);
+
+    expect(new Set(elevation.computedGeometry.lites.map((lite) => lite.mark))).toEqual(new Set(["G1"]));
+    expect(elevation.computedGlass.items).toHaveLength(1);
+    expect(elevation.computedGlass.items[0]).toMatchObject({
+      mark: "G1",
+      qty: 4,
+      location: "R1C1, R1C2, R2C1, R2C2",
+      sourceType: "storefront-lite"
+    });
+  });
+
+  it("generates advisory warnings without blocking ordinary PDF output", () => {
+    const elevation = calculateElevation(pairDoorSeedInput, context);
+    const codes = elevation.validationFlags.map((flag) => flag.code);
+
+    expect(codes).toContain("safety-glazing");
+    expect(codes).toContain("expansion-vertical-advisory");
+    expect(codes).toContain("existing-building-context");
+    expect(elevation.validationFlags.some((flag) => flag.severity === "error")).toBe(false);
+  });
+
+  it("renders multiple door sets in separate left-to-right bays", () => {
+    const elevation = calculateElevation(
+      {
+        ...pairDoorSeedInput,
+        columns: 4,
+        doorConfig: {
+          ...pairDoorSeedInput.doorConfig,
+          doorSetCount: 2,
+          doorSets: [
+            {
+              ...pairDoorSeedInput.doorConfig.doorSets[0],
+              columnIndex: 1
+            },
+            {
+              ...pairDoorSeedInput.doorConfig.doorSets[0],
+              id: "door-set-2",
+              columnIndex: 2,
+              doorType: "single",
+              hardwareNoteIds: ["closer", "pull-push"]
+            }
+          ]
+        }
+      },
+      context
+    );
+    const doorGlass = elevation.computedGlass.items.filter((item) => item.sourceType === "door-lite");
+
+    expect(elevation.computedGeometry.doorOpenings).toHaveLength(2);
+    expect(elevation.computedGeometry.doorOpenings.map((door) => door.columnIndex)).toEqual([1, 2]);
+    expect(elevation.computedGeometry.doorOpenings.map((door) => door.leafCount)).toEqual([2, 1]);
+    expect(elevation.computedGeometry.assemblyCallouts.filter((callout) => callout.type === "door").map((callout) => callout.mark)).toEqual(["DA1", "DA2"]);
+    expect(elevation.computedGeometry.bays.filter((bay) => bay.type === "door")).toHaveLength(2);
+    expect(doorGlass.reduce((qty, item) => qty + item.qty, 0)).toBe(3);
+    expect(elevation.validationFlags.some((flag) => flag.message.includes("only places Door Set 1"))).toBe(false);
+  });
+
+  it("creates immutable revision snapshots", () => {
+    const elevation = calculateElevation(noDoorSeedInput, context);
+    const revision = createRevisionSnapshot(elevation, "A");
+
+    elevation.computedGeometry.lites[0].glassWidth = 999;
+
+    expect(revision.number).toBe("A");
+    expect(revision.snapshot.computedGeometry.lites[0].glassWidth).not.toBe(999);
+    expect(revision.snapshot.input.name).toBe(noDoorSeedInput.name);
+  });
+
+  it("automates revision numbers from existing saved revisions", () => {
+    expect(getNextRevisionNumber([])).toBe("A");
+    expect(getNextRevisionNumber([{ number: "A" }, { number: "B" }])).toBe("C");
+    expect(getNextRevisionNumber([{ number: "Z" }])).toBe("AA");
+  });
+});

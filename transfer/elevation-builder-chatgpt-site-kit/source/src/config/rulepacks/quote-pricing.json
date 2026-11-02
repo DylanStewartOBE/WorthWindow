@@ -1,0 +1,27 @@
+{
+  "id": "worth-baseline-quote-pricing",
+  "name": "Worth Baseline Quote Pricing",
+  "version": "0.1.0",
+  "effectiveDate": "2026-04-30",
+  "owner": "Worth Construction Sales",
+  "rates": {
+    "glassPerSquareFoot": 12.5,
+    "aluminumPerLinearFoot": 7.75,
+    "highHeavyGlassPremiumPerSquareFoot": 10,
+    "lowHeavyGlassPremiumPerSquareFoot": 4,
+    "singleDoorAdder": 3000,
+    "pairDoorAdder": 4500
+  },
+  "margin": {
+    "percent": 0
+  },
+  "heavyGlassThresholds": {
+    "highHeightInches": 60,
+    "highWeightPounds": 50,
+    "lowWeightPounds": 150
+  },
+  "assumptions": [
+    "Budgetary field quote based on job glass, aluminum length, heavy-glass handling, and standard entrance adders.",
+    "Quote excludes engineering, structural review, taxes, permit fees, special hardware, and field conditions not captured in this v1 estimator."
+  ]
+}

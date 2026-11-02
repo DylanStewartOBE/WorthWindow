@@ -14,6 +14,7 @@ import { getKneeWallRuns } from "../domain/kneeWall";
 import { buildMetalTakeoff, type MetalTakeoffLine } from "../domain/metal";
 import { buildStorefrontQuotePresentation, type QuotePresentation } from "../domain/quotePresentation";
 import type { BrandingConfig, Elevation, GlassItem, Job, Lite, QuoteRulePack, ValidationFlag } from "../domain/types";
+export { downloadBlob, pdfFileName } from "./fileUtilities";
 
 const LETTER_LANDSCAPE = {
   width: 792,
@@ -23,8 +24,6 @@ const LETTER_LANDSCAPE = {
 type PdfGenerationOptions = {
   showAssemblyNumbers?: boolean;
 };
-
-type PdfType = "elevation" | "glass-takeoff" | "package" | "quote";
 
 type GlassTakeoffRow = GlassItem & {
   elevationLabel: string;
@@ -103,25 +102,6 @@ export function generateJobQuotePdf(elevations: Elevation[], job: Job, branding:
   drawSheetChrome(doc, "CUSTOMER QUOTE", "Q-1", quoteElevations[0], job, branding, "All elevations");
   drawQuoteSheet(doc, quotePresentation, 54, 130, 684);
   return doc.output("blob");
-}
-
-export function downloadBlob(blob: Blob, fileName: string): string {
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = fileName;
-  anchor.click();
-  return url;
-}
-
-export function pdfFileName(job: Job, elevation: Elevation | null, type: PdfType): string {
-  const safeCompany = "worth-construction";
-  const safeJob = sanitize(job.number || job.name || "job");
-  const safeSubject = elevation && (type === "elevation" || type === "glass-takeoff")
-    ? sanitize(elevation.name || elevation.id)
-    : "all-elevations";
-  const safeType = sanitize(type === "package" ? "drawing-package" : type === "quote" ? "customer-quote" : type);
-  return `${safeCompany}_${safeJob}_${safeSubject}_${safeType}_rev-${sanitize(job.activeRevision || "A")}.pdf`;
 }
 
 function ensureElevations(elevations: Elevation[]): Elevation[] {
@@ -1129,13 +1109,6 @@ function formatWeight(value: number): string {
 function formatKneeWallRunLabel(startColumnIndex: number, endColumnIndex: number): string {
   if (startColumnIndex === endColumnIndex) return `A${startColumnIndex + 1}`;
   return `A${startColumnIndex + 1}-A${endColumnIndex + 1}`;
-}
-
-function sanitize(value: string): string {
-  return value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-|-$/g, "");
 }
 
 function hexToRgb(hex: string | undefined, fallback: [number, number, number]): [number, number, number] {

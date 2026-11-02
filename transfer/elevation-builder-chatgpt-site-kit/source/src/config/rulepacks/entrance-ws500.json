@@ -1,0 +1,25 @@
+{
+  "id": "ws500-standard-entrance-scaffold",
+  "name": "WS-500 Compatible Standard Entrance Scaffold",
+  "version": "0.1.0",
+  "defaultLeafWidth": 36,
+  "defaultPairLeafWidth": 36,
+  "defaultDoorHeight": 84,
+  "bottomRailMinimum": 10,
+  "assumedClearWidthDeduct": 2.25,
+  "supportedSwings": ["inswing", "outswing"],
+  "supportedHingeTypes": ["butt", "pivot", "continuous-gear", "center-hung"],
+  "hardwareCompatibility": {
+    "rim-panic": ["single", "pair"],
+    "surface-vertical-rod": ["pair"],
+    "concealed-vertical-rod": ["pair"],
+    "closer": ["single", "pair"],
+    "pull-push": ["single", "pair"]
+  },
+  "notes": [
+    "Standard entrance package is note-level only in V1; verify final entrance fabrication details with approved entrance documents.",
+    "Default door leaves are 36 in x 84 in with medium-stile assumptions unless overridden.",
+    "Bottom rail note assumes 10 in minimum."
+  ]
+}
+

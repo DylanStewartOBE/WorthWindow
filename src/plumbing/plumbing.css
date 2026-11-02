@@ -629,3 +629,618 @@
   background: #fef2f2 !important;
   color: #b91c1c !important;
 }
+
+/* Plan takeoff */
+
+.pl-shell .pl-plan-empty {
+  display: grid;
+  justify-items: start;
+  gap: 12px;
+}
+
+.pl-shell .pl-import {
+  display: grid;
+  gap: 6px;
+  width: 100%;
+  margin: 8px 0;
+  color: #334155;
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.pl-shell .pl-import progress {
+  width: 100%;
+  accent-color: #48652f;
+}
+
+.pl-shell .pl-sheet-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 8px;
+}
+
+.pl-shell .pl-sheet-card {
+  display: grid;
+  gap: 4px;
+  align-content: start;
+  min-height: 96px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  padding: 10px;
+  text-align: left;
+}
+
+.pl-shell .pl-sheet-card strong {
+  color: #111827;
+  font-size: 1rem;
+}
+
+.pl-shell .pl-sheet-card span {
+  overflow: hidden;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pl-shell .pl-sheet-card small {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.pl-shell .pl-sheet-card.selected {
+  border-color: #48652f;
+  background: #eef5ea;
+}
+
+.pl-shell .pl-scale-chip {
+  justify-self: start;
+  border-radius: 999px;
+  background: #f1f5f9;
+  padding: 1px 7px;
+}
+
+.pl-shell .pl-scale-chip.detected,
+.pl-shell .pl-scale-chip.manual { background: #dbeafe; color: #1e40af !important; }
+.pl-shell .pl-scale-chip.calibrated { background: #dfead7; color: #48652f !important; }
+.pl-shell .pl-scale-chip.missing { background: #fee2e2; color: #991b1b !important; }
+
+.pl-shell .pl-plan-workspace {
+  display: grid;
+  gap: 10px;
+}
+
+.pl-shell .pl-plan-workspace.expanded {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left));
+}
+
+.pl-shell .pl-plan-workspace.expanded .pl-plan-stage {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 0;
+}
+
+.pl-shell .pl-plan-workspace.expanded .pl-plan-panels,
+.pl-shell .pl-plan-workspace.expanded .pl-plan-head .field-note {
+  display: none;
+}
+
+.pl-shell .pl-plan-workspace.expanded .pl-plan-head h2 {
+  overflow: hidden;
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pl-shell .pl-plan-workspace.expanded .pl-plan-head > div {
+  min-width: 0;
+}
+
+.pl-shell .pl-plan-workspace.expanded .pl-plan-hint {
+  padding: 5px 8px;
+  font-size: 0.76rem;
+}
+
+.pl-shell .pl-plan-workspace.expanded .pl-plan-settings .field span {
+  font-size: 0.68rem;
+}
+
+.pl-shell .pl-plan-workspace.expanded .pl-plan-settings select {
+  min-height: 36px;
+  padding: 4px 8px;
+  font-size: 0.82rem;
+}
+
+.pl-shell .pl-plan-workspace.expanded .pl-plan-toolbar button,
+.pl-shell .pl-plan-workspace.expanded .pl-toggle {
+  min-height: 36px;
+}
+
+.pl-shell .pl-plan-workspace.expanded .pl-plan-actions {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+
+.pl-shell .pl-plan-workspace.expanded .pl-plan-actions button {
+  flex: 1 1 0;
+  min-height: 40px;
+  padding: 6px 8px;
+  font-size: 0.82rem;
+  white-space: nowrap;
+}
+
+.pl-shell .pl-expand {
+  flex: 0 0 auto;
+  min-height: 38px;
+  padding: 6px 10px;
+}
+
+.pl-shell .pl-plan-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pl-shell .pl-plan-head h2 {
+  margin: 0;
+}
+
+.pl-shell .pl-plan-head p {
+  margin: 2px 0 0;
+}
+
+.pl-shell .pl-plan-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.pl-shell .pl-plan-toolbar button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 42px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  padding: 0 12px;
+  font-weight: 800;
+}
+
+.pl-shell .pl-plan-toolbar button.selected {
+  border-color: #48652f;
+  background: #dfead7;
+  color: #48652f;
+}
+
+.pl-shell .pl-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  margin-left: auto;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.pl-shell .pl-toggle input {
+  width: 18px;
+  height: 18px;
+  accent-color: #48652f;
+}
+
+.pl-shell .pl-plan-settings {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.pl-shell .pl-plan-settings.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.pl-shell .pl-plan-settings .field {
+  margin-bottom: 0;
+}
+
+.pl-shell .pl-plan-hint {
+  margin: 0;
+  border-radius: 8px;
+  background: #f1f5f9;
+  color: #334155;
+  padding: 8px 10px;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.pl-shell .pl-plan-stage {
+  height: min(68vh, 680px);
+  min-height: 320px;
+}
+
+.pl-shell .pl-plan-viewer {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: #e2e8f0;
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  outline: none;
+}
+
+.pl-shell .pl-plan-viewer:focus-visible {
+  box-shadow: 0 0 0 3px rgba(72, 101, 47, 0.35);
+}
+
+.pl-shell .pl-plan-viewer.tool-pipe,
+.pl-shell .pl-plan-viewer.tool-fixture,
+.pl-shell .pl-plan-viewer.tool-calibrate {
+  cursor: crosshair;
+}
+
+.pl-shell .pl-plan-canvas,
+.pl-shell .pl-plan-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+
+.pl-shell .pl-plan-canvas {
+  transform-origin: 0 0;
+}
+
+.pl-shell .pl-plan-loading,
+.pl-shell .pl-plan-readout {
+  position: absolute;
+  border-radius: 8px;
+  background: rgba(15, 23, 42, 0.82);
+  color: #ffffff;
+  padding: 6px 10px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.pl-shell .pl-plan-loading {
+  top: 12px;
+  left: 12px;
+}
+
+.pl-shell .pl-plan-readout {
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+.pl-shell .pl-plan-zoom {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  display: grid;
+  gap: 6px;
+}
+
+.pl-shell .pl-plan-zoom button {
+  min-width: 44px;
+  min-height: 40px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.95);
+  color: #0f172a;
+  font-size: 0.95rem;
+  font-weight: 900;
+}
+
+.pl-shell .pl-plan-missing {
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 10px;
+  height: 100%;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  padding: 20px;
+  text-align: center;
+}
+
+.pl-shell .pl-plan-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.pl-shell .pl-plan-actions .field {
+  flex: 1 1 220px;
+  margin-bottom: 0;
+}
+
+.pl-shell .pl-plan-panels {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 10px;
+  align-items: start;
+}
+
+.pl-shell .pl-plan-panel {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #f8fafc;
+  padding: 12px;
+}
+
+.pl-shell .pl-plan-panel .field-grid {
+  gap: 8px;
+}
+
+.pl-shell .pl-panel-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pl-shell .pl-swatch {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  border-radius: 4px;
+}
+
+.pl-shell .pl-facts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0;
+}
+
+.pl-shell .pl-facts div {
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 6px 8px;
+}
+
+.pl-shell .pl-facts dt {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.pl-shell .pl-facts dd {
+  margin: 2px 0 0;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.pl-shell .pl-fitting-list {
+  display: grid;
+  gap: 2px;
+}
+
+.pl-shell .pl-fitting-list span {
+  color: #374151;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.pl-shell .pl-fitting-list small {
+  color: #334155;
+  font-size: 0.82rem;
+}
+
+.pl-shell .pl-warn-text {
+  color: #92400e !important;
+  font-weight: 800;
+}
+
+.pl-shell .pl-notes-list {
+  margin: 0;
+  padding-left: 18px;
+  color: #475569;
+  font-size: 0.8rem;
+}
+
+.pl-shell .pl-run-list {
+  display: grid;
+  gap: 4px;
+}
+
+.pl-shell .pl-run-list button {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #334155;
+  padding: 4px 10px;
+  text-align: left;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.pl-shell .pl-run-list button.selected {
+  border-color: #facc15;
+  background: #fefce8;
+}
+
+.pl-shell .pl-run-list button span:nth-child(2) {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pl-shell .pl-file-list {
+  display: grid;
+  gap: 8px;
+}
+
+.pl-shell .pl-file-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 10px 12px;
+}
+
+.pl-shell .pl-file-row > div {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pl-shell .pl-file-row small {
+  color: #64748b;
+  font-size: 0.78rem;
+}
+
+.pl-shell .pl-plan-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #1e3a8a;
+  padding: 8px 10px;
+  font-size: 0.84rem;
+  font-weight: 700;
+}
+
+.pl-shell .pl-plan-note span {
+  flex: 1 1 200px;
+}
+
+/* Shopping list */
+
+.pl-shell .pl-brand-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 4px 10px;
+}
+
+.pl-shell .pl-inline-add {
+  display: flex;
+  gap: 6px;
+}
+
+.pl-shell .pl-inline-add input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.pl-shell .pl-order-cell {
+  font-weight: 900;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.pl-shell .pl-cut-line {
+  display: grid;
+  gap: 4px;
+  border-bottom: 1px solid #e2e8f0;
+  padding: 10px 0;
+}
+
+.pl-shell .pl-pieces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.pl-shell .pl-pieces span {
+  border: 1px solid #e2e8f0;
+  border-radius: 6px;
+  background: #f8fafc;
+  padding: 1px 6px;
+  font-size: 0.76rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pl-shell .pl-shopping-text {
+  width: 100%;
+  min-height: 160px;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.8rem;
+  resize: vertical;
+}
+
+@media (max-width: 640px) {
+  .pl-shell .pl-plan-settings {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pl-shell .pl-plan-stage {
+    height: 62vh;
+  }
+
+  .pl-shell .pl-toggle {
+    margin-left: 0;
+  }
+
+  .pl-shell .pl-plan-toolbar button {
+    flex: 1 1 auto;
+    justify-content: center;
+    padding: 0 8px;
+  }
+
+  .pl-shell .pl-plan-workspace.expanded .pl-plan-settings {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 4px;
+  }
+
+  .pl-shell .pl-plan-workspace.expanded .pl-plan-settings.two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .pl-shell .pl-plan-workspace.expanded .pl-plan-settings select {
+    padding: 2px 4px;
+    font-size: 0.74rem;
+  }
+
+  .pl-shell .pl-plan-workspace.expanded .pl-plan-toolbar {
+    flex-wrap: nowrap;
+    gap: 4px;
+  }
+
+  .pl-shell .pl-plan-workspace.expanded .pl-plan-toolbar button {
+    padding: 0 6px;
+    font-size: 0.76rem;
+  }
+
+  .pl-shell .pl-plan-workspace.expanded .pl-toggle span {
+    font-size: 0.7rem;
+  }
+}

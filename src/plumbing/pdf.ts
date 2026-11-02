@@ -1,6 +1,7 @@
 import { jsPDF } from "jspdf";
 import type { BrandingConfig } from "../domain/types";
 import { formatCurrency, formatInchesFraction, formatPipeSize, formatQty } from "./domain/math";
+import type { ShoppingList } from "./domain/shopping";
 import type { PlumbingJob, PlumbingPhase, PlumbingQuote, PlumbingTakeoff } from "./domain/types";
 
 const PAGE = { width: 792, height: 612 };
@@ -15,6 +16,19 @@ const PHASE_LABELS: Record<PlumbingPhase, string> = {
   underground: "Underground",
   rough: "Rough-in",
   trim: "Set & trim"
+};
+
+const FITTING_SHORT: Record<string, string> = {
+  elbow90: "90",
+  elbow45: "45",
+  elbow22: "22-1/2",
+  elbow11: "11-1/4",
+  riser90: "riser 90",
+  tee: "tee",
+  wye: "wye",
+  combo: "combo wye",
+  coupling: "coupling",
+  reducer: "reducer"
 };
 
 type Column<T> = {
@@ -315,6 +329,46 @@ export function generatePlumbingTakeoffPdf(
     takeoff.pipeTotals
   );
 
+  if (takeoff.planRuns.length > 0) {
+    pdf.startSheet("Runs Measured From Plans", "PL-3A");
+    pdf.table(
+      [
+        { header: "Run", width: 200, value: (row) => row.label },
+        { header: "Plan ft", width: 60, align: "right", value: (row) => (row.measured ? formatQty(row.horizontalFt) : "no scale") },
+        { header: "Rise/drop", width: 60, align: "right", value: (row) => formatQty(row.verticalFt) },
+        { header: "Total ft", width: 60, align: "right", value: (row) => formatQty(row.totalFt) },
+        {
+          header: "Fittings",
+          width: 220,
+          value: (row) =>
+            row.fittingItems
+              .map(
+                (item) =>
+                  `${item.qty} x ${item.branchSize ? `${formatPipeSize(item.size)}x${formatPipeSize(item.branchSize)}` : formatPipeSize(item.size)} ${FITTING_SHORT[item.type] ?? item.type}`
+              )
+              .join(", ") || "-"
+        },
+        { header: "Trench (cy)", width: 120, align: "right", value: (row) => (row.trench ? `${formatQty(row.trench.excavationCy)} dig / ${formatQty(row.trench.beddingCy)} bed` : "-") }
+      ],
+      takeoff.planRuns
+    );
+    pdf.paragraph("Plan lengths are measured on the sheet at its set scale. Area repeat counts are applied in the material takeoff, not in this table.");
+  }
+
+  if (takeoff.cutList.length > 0) {
+    pdf.startSheet("Pipe Cut List", "PL-3B");
+    pdf.table(
+      [
+        { header: "Pipe", width: 220, value: (row) => `${formatPipeSize(row.size)} ${row.materialLabel}` },
+        { header: "Stock", width: 50, align: "right", value: (row) => `${row.stockLengthFt}'` },
+        { header: "Order", width: 50, align: "right", value: (row) => String(row.sticks) },
+        { header: "Installed ft", width: 70, align: "right", value: (row) => formatQty(row.usedFt) },
+        { header: "Pieces (ft)", width: 330, value: (row) => row.pieces.map((piece) => formatQty(piece)).join(", ") }
+      ],
+      takeoff.cutList
+    );
+  }
+
   pdf.startSheet("Rough-In Field Verification", "PL-4");
   pdf.table(
     [
@@ -382,9 +436,33 @@ export function generatePlumbingQuotePdf(job: PlumbingJob, quote: PlumbingQuote,
   return pdf.output();
 }
 
-export function plumbingFileName(job: PlumbingJob, type: "takeoff" | "quote" | "materials"): string {
+export function generateShoppingListPdf(job: PlumbingJob, list: ShoppingList, branding: BrandingConfig): Blob {
+  const pdf = new PlumbingPdf(job, branding, "Shopping list");
+  pdf.startSheet("Material Shopping List", "PS-1");
+  pdf.paragraph("Pipe is listed in full stock lengths from the cut list. Fittings are by type and size. Prices are budget values from the Worth catalog.", PAGE.width - MARGIN * 2, 8);
+  pdf.y += 4;
+  list.sections.forEach((section) => {
+    pdf.heading(section.name);
+    pdf.table(
+      [
+        { header: "Order", width: 110, value: (row) => row.orderText },
+        { header: "Brand", width: 130, value: (row) => row.brand || "-" },
+        { header: "Item", width: 330, value: (row) => row.description },
+        { header: "Unit", width: 70, align: "right", value: (row) => formatCurrency(row.unitCost) },
+        { header: "Ext.", width: 80, align: "right", value: (row) => formatCurrency(row.extCost) }
+      ],
+      section.items,
+      { totalRow: [`${section.name} total`, "", "", "", formatCurrency(section.total)] }
+    );
+  });
+  pdf.heading(`Material total (before tax): ${formatCurrency(list.total)}`);
+  return pdf.output();
+}
+
+export function plumbingFileName(job: PlumbingJob, type: "takeoff" | "quote" | "materials" | "shopping" | "shopping-csv"): string {
   const safe = (value: string) => value.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "job";
-  const extension = type === "materials" ? "csv" : "pdf";
+  const extension = type === "materials" || type === "shopping-csv" ? "csv" : "pdf";
+  if (type === "shopping-csv") type = "shopping";
   return `worth-construction_${safe(job.number || job.name)}_plumbing-${type}_rev-${safe(job.revision || "A")}.${extension}`;
 }
 

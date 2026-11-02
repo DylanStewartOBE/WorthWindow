@@ -1,10 +1,14 @@
+import { analyzePlans, buildCutListLine, type PlanFixtureLine } from "../plan/analyze";
 import { formatPipeSize, round, roundCurrency } from "./math";
 import { evaluateRoughIn } from "./roughIn";
 import { calculateSizing } from "./sizing";
 import { validatePlumbingJob } from "./validation";
 import type {
+  CutListLine,
+  FittingTypeRule,
   FixtureScheduleLine,
   FixtureType,
+  FurnishedBy,
   MaterialItem,
   MaterialTakeoffLine,
   PipeMaterial,
@@ -19,7 +23,17 @@ import type {
 } from "./types";
 
 const PHASE_ORDER: PlumbingPhase[] = ["underground", "rough", "trim"];
-const KIND_ORDER: TakeoffLineKind[] = ["fixture", "labor", "kit", "pipe", "fitting", "hanger", "insulation"];
+const KIND_ORDER: TakeoffLineKind[] = [
+  "fixture",
+  "labor",
+  "excavation",
+  "site-material",
+  "kit",
+  "pipe",
+  "fitting",
+  "hanger",
+  "insulation"
+];
 
 /** Pure entry point: job input + rule packs -> complete takeoff. */
 export function buildPlumbingTakeoff(job: PlumbingJob, config: PlumbingConfig): PlumbingTakeoff {
@@ -27,17 +41,22 @@ export function buildPlumbingTakeoff(job: PlumbingJob, config: PlumbingConfig): 
   const materials = new Map(config.materialCatalog.materials.map((material) => [material.id, material]));
   const areaMultiplier = new Map(job.areas.map((area) => [area.id, normalizeMultiplier(area.multiplier)]));
 
-  const fixtureSchedule = buildFixtureSchedule(job, fixtures);
+  const plan = analyzePlans(job, config);
+  const allRuns = [...job.runs, ...plan.derivedRuns];
+  const fixtureSchedule = buildFixtureSchedule(job, fixtures, plan.fixtureLines);
   const lines = new LineAccumulator();
 
   addFixtureLines(lines, fixtureSchedule, fixtures, materials);
-  const pipeTotals = addPipeLines(lines, job.runs, areaMultiplier, config, materials);
+  const { totals: pipeTotals, cutList } = addPipeLines(lines, allRuns, areaMultiplier, config, materials);
+  addExcavationLines(lines, allRuns, areaMultiplier, config);
 
-  const sizing = calculateSizing(fixtureSchedule, fixtures, job.runs, config.pipingRulePack);
+  const sizing = calculateSizing(fixtureSchedule, fixtures, allRuns, config.pipingRulePack);
   const roughIn = evaluateRoughIn(job, fixtures);
   const fixtureCount = fixtureSchedule.reduce((total, line) => total + line.totalQty, 0);
   const takeoffWithoutFlags = {
     fixtureSchedule,
+    planRuns: plan.results,
+    cutList,
     fixtureCount,
     materials: lines.toSortedLines(),
     pipeTotals,
@@ -47,44 +66,57 @@ export function buildPlumbingTakeoff(job: PlumbingJob, config: PlumbingConfig): 
 
   return {
     ...takeoffWithoutFlags,
-    flags: validatePlumbingJob(job, takeoffWithoutFlags, fixtures, config)
+    flags: validatePlumbingJob(job, takeoffWithoutFlags, fixtures, config, allRuns)
   };
 }
 
-export function buildFixtureSchedule(job: PlumbingJob, fixtures: Map<string, FixtureType>): FixtureScheduleLine[] {
+export function buildFixtureSchedule(
+  job: PlumbingJob,
+  fixtures: Map<string, FixtureType>,
+  planLines: PlanFixtureLine[] = []
+): FixtureScheduleLine[] {
   const isPublic = job.buildingType === "commercial";
   const schedule: FixtureScheduleLine[] = [];
+  const areas = new Map(job.areas.map((area) => [area.id, area]));
 
-  job.areas.forEach((area) => {
-    const multiplier = normalizeMultiplier(area.multiplier);
-    area.fixtures.forEach((line) => {
-      const fixture = fixtures.get(line.fixtureTypeId);
-      const qty = Math.max(0, Math.round(line.qty));
-      if (!fixture || qty === 0) return;
-      const dfuEach = isPublic ? fixture.publicUse?.dfu ?? fixture.dfu : fixture.dfu;
-      const wsfuEach = isPublic ? fixture.publicUse?.wsfu ?? fixture.wsfu : fixture.wsfu;
-      const totalQty = qty * multiplier;
-      schedule.push({
-        areaId: area.id,
-        areaName: area.name,
-        multiplier,
-        fixtureTypeId: fixture.id,
-        label: fixture.label,
-        qtyPerArea: qty,
-        totalQty,
-        furnishedBy: line.furnishedBy,
-        dfuEach,
-        wsfuEach,
-        totalDfu: round(dfuEach * totalQty, 2),
-        totalWsfu: {
-          cold: round(wsfuEach.cold * totalQty, 2),
-          hot: round(wsfuEach.hot * totalQty, 2),
-          total: round(wsfuEach.total * totalQty, 2)
-        }
-      });
+  const push = (
+    areaId: string,
+    fixtureTypeId: string,
+    rawQty: number,
+    furnishedBy: FurnishedBy,
+    source: FixtureScheduleLine["source"]
+  ) => {
+    const fixture = fixtures.get(fixtureTypeId);
+    const qty = Math.max(0, Math.round(rawQty));
+    if (!fixture || qty === 0) return;
+    const area = areas.get(areaId);
+    const multiplier = normalizeMultiplier(area?.multiplier);
+    const dfuEach = isPublic ? fixture.publicUse?.dfu ?? fixture.dfu : fixture.dfu;
+    const wsfuEach = isPublic ? fixture.publicUse?.wsfu ?? fixture.wsfu : fixture.wsfu;
+    const totalQty = qty * multiplier;
+    schedule.push({
+      areaId,
+      areaName: area?.name ?? "Building-wide",
+      multiplier,
+      fixtureTypeId: fixture.id,
+      label: fixture.label,
+      qtyPerArea: qty,
+      totalQty,
+      furnishedBy,
+      source,
+      dfuEach,
+      wsfuEach,
+      totalDfu: round(dfuEach * totalQty, 2),
+      totalWsfu: {
+        cold: round(wsfuEach.cold * totalQty, 2),
+        hot: round(wsfuEach.hot * totalQty, 2),
+        total: round(wsfuEach.total * totalQty, 2)
+      }
     });
-  });
+  };
 
+  job.areas.forEach((area) => area.fixtures.forEach((line) => push(area.id, line.fixtureTypeId, line.qty, line.furnishedBy, "manual")));
+  planLines.forEach((line) => push(line.areaId, line.fixtureTypeId, line.qty, line.furnishedBy, "plan"));
   return schedule;
 }
 
@@ -110,7 +142,8 @@ function addFixtureLines(
       qty,
       unitCost: byWorth ? fixture.fixtureAllowance : 0,
       laborHours: 0,
-      orderNote: byWorth ? "" : "Install only"
+      orderNote: byWorth ? "" : "Install only",
+      brandKey: `fixture:${fixture.id}`
     });
 
     lines.add({
@@ -154,12 +187,22 @@ function addFixtureLines(
           unit: material?.unit ?? "ea",
           qty: item.qty * qty,
           unitCost: material?.unitCost ?? 0,
-          laborHours: material?.laborHours ?? 0
+          laborHours: material?.laborHours ?? 0,
+          brandKey: `material:${item.materialId}`
         });
       });
     });
   });
 }
+
+type PipeAccumulator = {
+  phase: PlumbingPhase;
+  material: PipeMaterial;
+  spec: PipeSizeSpec | undefined;
+  size: number;
+  lengthFt: number;
+  pieces: number[];
+};
 
 function addPipeLines(
   lines: LineAccumulator,
@@ -167,12 +210,13 @@ function addPipeLines(
   areaMultiplier: Map<string, number>,
   config: PlumbingConfig,
   materials: Map<string, MaterialItem>
-): PipeRunTotal[] {
+): { totals: PipeRunTotal[]; cutList: CutListLine[] } {
   const rules = config.pipingRulePack;
   const pipeMaterials = new Map(rules.pipeMaterials.map((material) => [material.id, material]));
   const systemRules = new Map(rules.systems.map((rule) => [rule.system, rule]));
+  const fittingRules = new Map<string, FittingTypeRule>((rules.fittingTypes ?? []).map((rule) => [rule.type, rule]));
   const totals = new Map<string, PipeRunTotal>();
-  const pipeLengths = new Map<string, { phase: PlumbingPhase; material: PipeMaterial; spec: PipeSizeSpec | undefined; size: number; lengthFt: number }>();
+  const pipeLengths = new Map<string, PipeAccumulator>();
 
   runs.forEach((run) => {
     const pipeMaterial = pipeMaterials.get(run.pipeMaterialId);
@@ -182,32 +226,56 @@ function addPipeLines(
     const spec = pipeMaterial.sizes.find((candidate) => candidate.size === run.size);
     const phase: PlumbingPhase = run.location === "underground" ? "underground" : "rough";
     const systemRule = systemRules.get(run.system);
-    const fittings = getRunFittingCount(run, systemRule?.fittingsPer100Ft ?? 0) * multiplier;
     const hangers = run.location === "underground" ? 0 : getRunHangerCount(run, pipeMaterial) * multiplier;
     const sizeLabel = formatPipeSize(run.size);
+    let fittingCount = 0;
 
     const lengthKey = `${phase}|${pipeMaterial.id}|${run.size}`;
-    const existingLength = pipeLengths.get(lengthKey);
-    pipeLengths.set(lengthKey, {
-      phase,
-      material: pipeMaterial,
-      spec,
-      size: run.size,
-      lengthFt: (existingLength?.lengthFt ?? 0) + lengthFt
-    });
+    const accumulator = pipeLengths.get(lengthKey) ?? { phase, material: pipeMaterial, spec, size: run.size, lengthFt: 0, pieces: [] };
+    accumulator.lengthFt += lengthFt;
+    const runPieces = run.pieces?.length ? run.pieces : [run.lengthFt];
+    for (let copy = 0; copy < multiplier; copy += 1) accumulator.pieces.push(...runPieces);
+    pipeLengths.set(lengthKey, accumulator);
 
-    if (fittings > 0) {
-      lines.add({
-        key: `${phase}|fitting|${pipeMaterial.id}|${run.size}`,
-        kind: "fitting",
-        phase,
-        group: "Fittings",
-        description: `${pipeMaterial.label} ${sizeLabel} fittings (avg)`,
-        unit: "ea",
-        qty: fittings,
-        unitCost: spec?.fittingCost ?? 0,
-        laborHours: spec?.laborHoursPerFitting ?? 0
+    if (run.fittingItems) {
+      run.fittingItems.forEach((item) => {
+        const rule = fittingRules.get(item.type);
+        const itemSpec = pipeMaterial.sizes.find((candidate) => candidate.size === item.size);
+        const name = rule ? (pipeMaterial.family === "dwv" ? rule.dwvLabel : rule.pressureLabel) : item.type;
+        const itemSize = item.branchSize !== undefined ? `${formatPipeSize(item.size)} x ${formatPipeSize(item.branchSize)}` : formatPipeSize(item.size);
+        const qty = item.qty * multiplier;
+        fittingCount += qty;
+        lines.add({
+          key: `${phase}|fitting|${pipeMaterial.id}|${item.type}|${item.size}|${item.branchSize ?? ""}`,
+          kind: "fitting",
+          phase,
+          group: "Fittings",
+          description: `${pipeMaterial.label} ${itemSize} ${name}`,
+          unit: "ea",
+          qty,
+          unitCost: (itemSpec?.fittingCost ?? 0) * (rule?.costFactor ?? 1),
+          laborHours: (itemSpec?.laborHoursPerFitting ?? 0) * (rule?.laborFactor ?? 1),
+          brandKey: `fitting:${pipeMaterial.id}`,
+          sizeLabel: itemSize
+        });
       });
+    } else {
+      fittingCount = getRunFittingCount(run, systemRule?.fittingsPer100Ft ?? 0) * multiplier;
+      if (fittingCount > 0) {
+        lines.add({
+          key: `${phase}|fitting|${pipeMaterial.id}|avg|${run.size}`,
+          kind: "fitting",
+          phase,
+          group: "Fittings",
+          description: `${pipeMaterial.label} ${sizeLabel} fittings (avg mix)`,
+          unit: "ea",
+          qty: fittingCount,
+          unitCost: spec?.fittingCost ?? 0,
+          laborHours: spec?.laborHoursPerFitting ?? 0,
+          brandKey: `fitting:${pipeMaterial.id}`,
+          sizeLabel
+        });
+      }
     }
 
     if (hangers > 0) {
@@ -221,7 +289,8 @@ function addPipeLines(
         unit: hanger?.unit ?? "ea",
         qty: hangers,
         unitCost: hanger?.unitCost ?? 0,
-        laborHours: hanger?.laborHours ?? 0
+        laborHours: hanger?.laborHours ?? 0,
+        brandKey: `material:${pipeMaterial.hangerMaterialId}`
       });
     }
 
@@ -237,7 +306,9 @@ function addPipeLines(
         unit: insulation?.unit ?? "lf",
         qty: lengthFt,
         unitCost: insulation?.unitCost ?? 0,
-        laborHours: insulation?.laborHours ?? 0
+        laborHours: insulation?.laborHours ?? 0,
+        brandKey: `material:${insulationId}`,
+        sizeLabel
       });
     }
 
@@ -252,16 +323,19 @@ function addPipeLines(
       size: run.size,
       location: run.location,
       lengthFt: round((total?.lengthFt ?? 0) + lengthFt, 2),
-      fittings: (total?.fittings ?? 0) + fittings,
+      fittings: (total?.fittings ?? 0) + fittingCount,
       hangers: (total?.hangers ?? 0) + hangers
     });
   });
 
-  pipeLengths.forEach(({ phase, material, spec, size, lengthFt }) => {
-    const withWaste = lengthFt * (1 + rules.wastePercent / 100);
-    const sticks = Math.ceil(round(withWaste / material.stickLengthFt, 4));
+  const cutList: CutListLine[] = [];
+  pipeLengths.forEach(({ phase, material, spec, size, lengthFt, pieces }, key) => {
+    const cut = buildCutListLine(key, material.id, material.label, size, material.stickLengthFt, pieces);
+    const wasteSticks = Math.ceil(round((lengthFt * (1 + rules.wastePercent / 100)) / material.stickLengthFt, 4));
+    const sticks = Math.max(cut.sticks, wasteSticks);
+    cutList.push({ ...cut, sticks });
     const orderQty = sticks * material.stickLengthFt;
-    const stickWord = material.stickLengthFt >= 50 ? (sticks === 1 ? "coil" : "coils") : sticks === 1 ? "stick" : "sticks";
+    const stockWord = material.stickLengthFt >= 50 ? (sticks === 1 ? "coil" : "coils") : sticks === 1 ? "stick" : "sticks";
     lines.add({
       key: `${phase}|pipe|${material.id}|${size}`,
       kind: "pipe",
@@ -273,13 +347,120 @@ function addPipeLines(
       unitCost: spec?.costPerFoot ?? 0,
       laborHours: spec?.laborHoursPerFoot ?? 0,
       orderQty,
-      orderNote: `${sticks} x ${material.stickLengthFt}' ${stickWord} (incl. ${rules.wastePercent}% waste)`
+      orderNote: `${sticks} x ${material.stickLengthFt}' ${stockWord} (cut list, min ${rules.wastePercent}% waste)`,
+      brandKey: `pipe:${material.id}`,
+      sizeLabel: formatPipeSize(size)
     });
   });
 
-  return [...totals.values()].sort(
-    (a, b) => a.system.localeCompare(b.system) || a.materialLabel.localeCompare(b.materialLabel) || b.size - a.size
-  );
+  return {
+    totals: [...totals.values()].sort(
+      (a, b) => a.system.localeCompare(b.system) || a.materialLabel.localeCompare(b.materialLabel) || b.size - a.size
+    ),
+    cutList: cutList.sort((a, b) => a.materialLabel.localeCompare(b.materialLabel) || b.size - a.size)
+  };
+}
+
+function addExcavationLines(lines: LineAccumulator, runs: PipeRun[], areaMultiplier: Map<string, number>, config: PlumbingConfig) {
+  const ex = config.pipingRulePack.excavation;
+  if (!ex) return;
+  let excavationCy = 0;
+  let beddingCy = 0;
+  let backfillCy = 0;
+  let tapeFt = 0;
+  let tracerFt = 0;
+
+  runs.forEach((run) => {
+    const trench = run.trenchCalc;
+    if (!trench) return;
+    const multiplier = run.areaId ? areaMultiplier.get(run.areaId) ?? 1 : 1;
+    excavationCy += trench.excavationCy * multiplier;
+    beddingCy += trench.beddingCy * multiplier;
+    backfillCy += trench.backfillCy * multiplier;
+    if (ex.warningTapeSystems.includes(run.system)) tapeFt += trench.lengthFt * multiplier;
+    if (ex.tracerWireSystems.includes(run.system) && ex.nonMetallicMaterialIds.includes(run.pipeMaterialId)) {
+      tracerFt += trench.lengthFt * multiplier;
+    }
+  });
+
+  const group = "Excavation & bedding";
+  if (excavationCy > 0) {
+    const hours = excavationCy / ex.excavateCyPerHour;
+    lines.add({
+      key: "underground|excavation|dig",
+      kind: "excavation",
+      phase: "underground",
+      group,
+      description: "Trench excavation",
+      unit: "cy",
+      qty: excavationCy,
+      unitCost: 0,
+      laborHours: 1 / ex.excavateCyPerHour
+    });
+    lines.add({
+      key: "underground|excavation|equipment",
+      kind: "excavation",
+      phase: "underground",
+      group,
+      description: `${ex.equipmentLabel} (with operator time above)`,
+      unit: "hr",
+      qty: hours,
+      unitCost: ex.equipmentRatePerHour,
+      laborHours: 0
+    });
+  }
+  if (backfillCy > 0) {
+    lines.add({
+      key: "underground|excavation|backfill",
+      kind: "excavation",
+      phase: "underground",
+      group,
+      description: "Backfill & compaction",
+      unit: "cy",
+      qty: backfillCy,
+      unitCost: 0,
+      laborHours: 1 / ex.backfillCyPerHour
+    });
+  }
+  if (beddingCy > 0) {
+    lines.add({
+      key: "underground|site-material|bedding",
+      kind: "site-material",
+      phase: "underground",
+      group,
+      description: ex.beddingLabel,
+      unit: "cy",
+      qty: beddingCy,
+      unitCost: ex.beddingCostPerCy,
+      laborHours: 0
+    });
+  }
+  if (tapeFt > 0) {
+    lines.add({
+      key: "underground|site-material|tape",
+      kind: "site-material",
+      phase: "underground",
+      group,
+      description: "Detectable warning tape",
+      unit: "lf",
+      qty: tapeFt,
+      unitCost: ex.warningTapeCostPerFt,
+      laborHours: 0
+    });
+  }
+  if (tracerFt > 0) {
+    lines.add({
+      key: "underground|site-material|tracer",
+      kind: "site-material",
+      phase: "underground",
+      group,
+      description: "Tracer wire for non-metallic pipe",
+      unit: "lf",
+      qty: tracerFt,
+      unitCost: ex.tracerWireCostPerFt,
+      laborHours: 0
+    });
+  }
 }
 
 export function getRunFittingCount(run: PipeRun, fittingsPer100Ft: number): number {
@@ -322,7 +503,8 @@ class LineAccumulator {
     return [...this.lines.values()]
       .map((line) => {
         const qty = round(line.qty, 2);
-        const orderQty = round(line.orderQty ?? line.qty, 2);
+        // Bulk site materials are ordered in whole units.
+        const orderQty = round(line.orderQty ?? (line.kind === "site-material" ? Math.ceil(line.qty) : line.qty), 2);
         return {
           ...line,
           qty,

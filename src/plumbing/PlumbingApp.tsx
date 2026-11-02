@@ -15,8 +15,10 @@ import {
   History,
   ListChecks,
   Plus,
+  Map as MapIcon,
   Save,
   Settings,
+  ShoppingCart,
   Share2,
   Trash2,
   Waypoints
@@ -38,6 +40,7 @@ import {
 } from "./domain/jobs";
 import { formatCurrency, formatInchesFraction, formatPipeSize, formatQty } from "./domain/math";
 import { calculatePlumbingQuote } from "./domain/quote";
+import { buildShoppingList, shoppingListCsv, shoppingListText } from "./domain/shopping";
 import { getMissingRoughInChecks } from "./domain/roughIn";
 import { buildPlumbingTakeoff, getRunFittingCount, getRunHangerCount, normalizeMultiplier } from "./domain/takeoff";
 import type {
@@ -58,6 +61,7 @@ import {
   buildMaterialCsv,
   generatePlumbingQuotePdf,
   generatePlumbingTakeoffPdf,
+  generateShoppingListPdf,
   plumbingFileName,
   roughInStatusLabel
 } from "./pdf";
@@ -74,22 +78,30 @@ import {
   Stepper,
   TextField
 } from "./ui/fields";
+import { PlansStep } from "./ui/PlansStep";
 import { prepareFileSaving, saveFile } from "./ui/saveFile";
+import { ShoppingStep } from "./ui/ShoppingStep";
 import "./plumbing.css";
 
 const steps = [
-  { label: "Job", icon: FileText },
-  { label: "Fixtures", icon: Droplets },
-  { label: "Piping", icon: Waypoints },
-  { label: "Field verify", icon: ClipboardCheck },
-  { label: "Takeoff", icon: ListChecks },
-  { label: "Quote", icon: Calculator }
-];
+  { id: "job", label: "Job", icon: FileText },
+  { id: "plans", label: "Plans", icon: MapIcon },
+  { id: "fixtures", label: "Fixtures", icon: Droplets },
+  { id: "piping", label: "Piping", icon: Waypoints },
+  { id: "field", label: "Field verify", icon: ClipboardCheck },
+  { id: "takeoff", label: "Takeoff", icon: ListChecks },
+  { id: "shopping", label: "Shopping list", icon: ShoppingCart },
+  { id: "quote", label: "Quote", icon: Calculator }
+] as const;
+
+type StepId = (typeof steps)[number]["id"];
+const stepIndex = (id: StepId) => steps.findIndex((step) => step.id === id);
 
 const PHASE_LABELS: Record<PlumbingPhase, string> = { underground: "Underground", rough: "Rough-in", trim: "Set & trim" };
 const CONFIG_STORAGE_KEY = "worth-plumbing-config";
 
 type UpdateJob = (updater: (job: PlumbingJob) => PlumbingJob) => void;
+type ExportType = "takeoff" | "quote" | "materials" | "shopping" | "shopping-csv";
 
 export function PlumbingApp({ onBackToProducts }: { onBackToProducts: () => void }) {
   const repository = useMemo(() => createPlumbingRepository(), []);
@@ -106,6 +118,7 @@ export function PlumbingApp({ onBackToProducts }: { onBackToProducts: () => void
 
   const takeoff = useMemo(() => buildPlumbingTakeoff(job, config), [job, config]);
   const quote = useMemo(() => calculatePlumbingQuote(job, takeoff, config.pricing), [job, takeoff, config.pricing]);
+  const shoppingList = useMemo(() => buildShoppingList(takeoff, job, config), [takeoff, job, config]);
   const fixtureMap = useMemo(() => new Map(config.fixtureLibrary.fixtures.map((fixture) => [fixture.id, fixture])), [config]);
 
   useEffect(prepareFileSaving, []);
@@ -208,7 +221,7 @@ export function PlumbingApp({ onBackToProducts }: { onBackToProducts: () => void
     setStatus(`Restored revision ${revision.number}`);
   };
 
-  const exportFile = async (type: "takeoff" | "quote" | "materials", share = false) => {
+  const exportFile = async (type: ExportType, share = false) => {
     try {
       const fileName = plumbingFileName(job, type);
       const blob =
@@ -216,7 +229,11 @@ export function PlumbingApp({ onBackToProducts }: { onBackToProducts: () => void
           ? generatePlumbingTakeoffPdf(job, takeoff, quote, defaultBranding)
           : type === "quote"
             ? generatePlumbingQuotePdf(job, quote, takeoff, defaultBranding)
-            : new Blob([buildMaterialCsv(takeoff)], { type: "text/csv" });
+            : type === "shopping"
+              ? generateShoppingListPdf(job, shoppingList, defaultBranding)
+              : type === "shopping-csv"
+                ? new Blob([shoppingListCsv(shoppingList)], { type: "text/csv" })
+                : new Blob([buildMaterialCsv(takeoff)], { type: "text/csv" });
 
       if (share) {
         const file = new File([blob], fileName, { type: blob.type || "application/pdf" });
@@ -270,7 +287,7 @@ export function PlumbingApp({ onBackToProducts }: { onBackToProducts: () => void
 
       <section className="workspace">
         <div className="work-panel pl-work-panel">
-          {activeStep === 0 && (
+          {steps[activeStep].id === "job" && (
             <JobStep
               job={job}
               jobs={jobs}
@@ -281,11 +298,30 @@ export function PlumbingApp({ onBackToProducts }: { onBackToProducts: () => void
               onDeleteJob={deleteJob}
             />
           )}
-          {activeStep === 1 && <FixturesStep job={job} updateJob={updateJob} config={config} takeoff={takeoff} />}
-          {activeStep === 2 && <PipingStep job={job} updateJob={updateJob} config={config} />}
-          {activeStep === 3 && <FieldVerifyStep job={job} updateJob={updateJob} fixtureMap={fixtureMap} takeoff={takeoff} />}
-          {activeStep === 4 && <TakeoffStep takeoff={takeoff} />}
-          {activeStep === 5 && (
+          {steps[activeStep].id === "plans" && (
+            <PlansStep job={job} updateJob={updateJob} config={config} takeoff={takeoff} repository={repository} onStatus={setStatus} />
+          )}
+          {steps[activeStep].id === "fixtures" && (
+            <FixturesStep job={job} updateJob={updateJob} config={config} takeoff={takeoff} onOpenPlans={() => setActiveStep(stepIndex("plans"))} />
+          )}
+          {steps[activeStep].id === "piping" && (
+            <PipingStep job={job} updateJob={updateJob} config={config} takeoff={takeoff} onOpenPlans={() => setActiveStep(stepIndex("plans"))} />
+          )}
+          {steps[activeStep].id === "field" && <FieldVerifyStep job={job} updateJob={updateJob} fixtureMap={fixtureMap} takeoff={takeoff} />}
+          {steps[activeStep].id === "takeoff" && <TakeoffStep takeoff={takeoff} />}
+          {steps[activeStep].id === "shopping" && (
+            <ShoppingStep
+              job={job}
+              updateJob={updateJob}
+              config={config}
+              takeoff={takeoff}
+              list={shoppingList}
+              listText={shoppingListText(shoppingList, job)}
+              onExport={(type) => exportFile(type)}
+              onStatus={setStatus}
+            />
+          )}
+          {steps[activeStep].id === "quote" && (
             <QuoteStep
               job={job}
               updateJob={updateJob}
@@ -386,7 +422,7 @@ function SummaryPanel({
         <Metric label="Labor" value={`${formatQty(quote.laborHours)} hr`} compactValue={`${Math.round(quote.laborHours)} hr`} />
         <Metric label="Est. total" value={formatCurrency(quote.total)} compactValue={formatCompactCurrency(quote.total)} />
       </div>
-      <button type="button" className={`pl-flag-summary${errors ? " error" : warnings ? " warning" : ""}`} onClick={() => onOpenStep(4)}>
+      <button type="button" className={`pl-flag-summary${errors ? " error" : warnings ? " warning" : ""}`} onClick={() => onOpenStep(stepIndex("takeoff"))}>
         {errors + warnings === 0 ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
         <span>
           {errors + warnings === 0
@@ -531,12 +567,14 @@ function FixturesStep({
   job,
   updateJob,
   config,
-  takeoff
+  takeoff,
+  onOpenPlans
 }: {
   job: PlumbingJob;
   updateJob: UpdateJob;
   config: PlumbingConfig;
   takeoff: PlumbingTakeoff;
+  onOpenPlans: () => void;
 }) {
   const fixtures = config.fixtureLibrary.fixtures;
   const fixtureMap = new Map(fixtures.map((fixture) => [fixture.id, fixture]));
@@ -681,6 +719,8 @@ function FixturesStep({
               })}
             </div>
 
+            <PlanFixtureNote lines={areaLines.filter((line) => line.source === "plan")} onOpenPlans={onOpenPlans} />
+
             <details className="pl-quick-add" open={area.fixtures.length === 0}>
               <summary>
                 <Plus size={16} /> Add fixtures
@@ -723,6 +763,13 @@ function FixturesStep({
         );
       })}
 
+      {takeoff.fixtureSchedule.some((line) => line.source === "plan" && !line.areaId) && (
+        <section className="step-content">
+          <SectionTitle title="Building-wide (from plans)" subtitle="Fixtures tapped on sheets that are not assigned to an area." />
+          <PlanFixtureNote lines={takeoff.fixtureSchedule.filter((line) => line.source === "plan" && !line.areaId)} onOpenPlans={onOpenPlans} />
+        </section>
+      )}
+
       <button
         type="button"
         className="secondary-button wide pl-add-area"
@@ -734,11 +781,39 @@ function FixturesStep({
   );
 }
 
+function PlanFixtureNote({ lines, onOpenPlans }: { lines: PlumbingTakeoff["fixtureSchedule"]; onOpenPlans: () => void }) {
+  if (lines.length === 0) return null;
+  return (
+    <div className="pl-plan-note">
+      <MapIcon size={16} />
+      <span>
+        From plans: {lines.map((line) => `${line.qtyPerArea} ${line.label}${line.furnishedBy === "others" ? " (by others)" : ""}`).join(", ")}
+        {lines[0].multiplier > 1 ? `, each x${lines[0].multiplier}` : ""}
+      </span>
+      <button type="button" className="text-button" onClick={onOpenPlans}>
+        Edit on plans
+      </button>
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Step 3: Piping
 // ---------------------------------------------------------------------------
 
-function PipingStep({ job, updateJob, config }: { job: PlumbingJob; updateJob: UpdateJob; config: PlumbingConfig }) {
+function PipingStep({
+  job,
+  updateJob,
+  config,
+  takeoff,
+  onOpenPlans
+}: {
+  job: PlumbingJob;
+  updateJob: UpdateJob;
+  config: PlumbingConfig;
+  takeoff: PlumbingTakeoff;
+  onOpenPlans: () => void;
+}) {
   const [areaFilter, setAreaFilter] = useState("all");
   const rules = config.pipingRulePack;
   const materials = rules.pipeMaterials;
@@ -801,7 +876,7 @@ function PipingStep({ job, updateJob, config }: { job: PlumbingJob; updateJob: U
 
       {visibleRuns.length === 0 && (
         <section className="step-content">
-          <p className="field-note">No pipe runs here yet. Add one above.</p>
+          <p className="field-note">No runs entered by hand here. Add one above, or draw runs on the Plans step.</p>
         </section>
       )}
 
@@ -882,6 +957,47 @@ function PipingStep({ job, updateJob, config }: { job: PlumbingJob; updateJob: U
           </section>
         );
       })}
+
+      {takeoff.planRuns.length > 0 && (
+        <section className="step-content">
+          <SectionTitle
+            title="Drawn on Plans"
+            subtitle="Measured from the plan sheets, with fittings counted by type. Edit these on the Plans step."
+            action={
+              <button type="button" className="text-button" onClick={onOpenPlans}>
+                <MapIcon size={15} /> Open plans
+              </button>
+            }
+          />
+          <div className="pl-table-wrap">
+            <table className="pl-table">
+              <thead>
+                <tr>
+                  <th>Run</th>
+                  <th className="num">Total ft</th>
+                  <th className="num">Fittings</th>
+                </tr>
+              </thead>
+              <tbody>
+                {takeoff.planRuns.map((result) => (
+                  <tr key={result.runId}>
+                    <td>
+                      {result.label}
+                      <small>
+                        {result.measured
+                          ? `${formatQty(result.horizontalFt)} ft on plan + ${formatQty(result.verticalFt)} ft rises/drops${result.trench ? ` · trench ${formatQty(result.trench.excavationCy)} cy` : ""}`
+                          : "Sheet has no scale"}
+                      </small>
+                    </td>
+                    <td className="num">{formatQty(result.totalFt)}</td>
+                    <td className="num">{result.fittingItems.reduce((total, item) => total + item.qty, 0)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
     </>
   );
 }
@@ -1217,7 +1333,7 @@ function QuoteStep({
   updateJob: UpdateJob;
   quote: PlumbingQuote;
   revisions: PlumbingRevision[];
-  onExport: (type: "takeoff" | "quote" | "materials", share?: boolean) => void;
+  onExport: (type: ExportType, share?: boolean) => void;
   onSaveRevision: () => void;
   onRestoreRevision: (revision: PlumbingRevision) => void;
 }) {

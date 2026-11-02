@@ -1,18 +1,27 @@
 import type { PlumbingJob, PlumbingRevision } from "./domain/types";
 
+export interface StoredPlanFile {
+  id: string;
+  name: string;
+  data: Blob;
+}
+
 export interface PlumbingRepository {
   getJobs(): Promise<PlumbingJob[]>;
+  getPlanFile(id: string): Promise<StoredPlanFile | undefined>;
+  savePlanFile(file: StoredPlanFile): Promise<void>;
+  deletePlanFile(id: string): Promise<void>;
   saveJob(job: PlumbingJob): Promise<void>;
   deleteJob(id: string): Promise<void>;
   getRevisions(jobId: string): Promise<PlumbingRevision[]>;
   saveRevision(revision: PlumbingRevision): Promise<void>;
 }
 
-type StoreName = "jobs" | "revisions";
+type StoreName = "jobs" | "revisions" | "planFiles";
 
 // Separate database from the storefront app so the two engines never share records.
 const DB_NAME = "worth-plumbing-takeoff";
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 class IndexedDbPlumbingRepository implements PlumbingRepository {
   private dbPromise: Promise<IDBDatabase> | undefined;
@@ -38,6 +47,18 @@ class IndexedDbPlumbingRepository implements PlumbingRepository {
     await this.request("revisions", "readwrite", (store) => store.put(revision));
   }
 
+  async getPlanFile(id: string): Promise<StoredPlanFile | undefined> {
+    return this.request<StoredPlanFile | undefined>("planFiles", "readonly", (store) => store.get(id));
+  }
+
+  async savePlanFile(file: StoredPlanFile): Promise<void> {
+    await this.request("planFiles", "readwrite", (store) => store.put(file));
+  }
+
+  async deletePlanFile(id: string): Promise<void> {
+    await this.request("planFiles", "readwrite", (store) => store.delete(id));
+  }
+
   private async request<T>(storeName: StoreName, mode: IDBTransactionMode, action: (store: IDBObjectStore) => IDBRequest): Promise<T> {
     const db = await this.open();
     return new Promise<T>((resolve, reject) => {
@@ -55,7 +76,7 @@ class IndexedDbPlumbingRepository implements PlumbingRepository {
         const request = indexedDB.open(DB_NAME, DB_VERSION);
         request.onupgradeneeded = () => {
           const db = request.result;
-          (["jobs", "revisions"] as StoreName[]).forEach((name) => {
+          (["jobs", "revisions", "planFiles"] as StoreName[]).forEach((name) => {
             if (!db.objectStoreNames.contains(name)) db.createObjectStore(name, { keyPath: "id" });
           });
         };
@@ -69,6 +90,20 @@ class IndexedDbPlumbingRepository implements PlumbingRepository {
 
 class LocalStoragePlumbingRepository implements PlumbingRepository {
   private key = "worth-plumbing-takeoff";
+  // PDFs are too large for localStorage; without IndexedDB they live for this session only.
+  private planFiles = new Map<string, StoredPlanFile>();
+
+  async getPlanFile(id: string): Promise<StoredPlanFile | undefined> {
+    return this.planFiles.get(id);
+  }
+
+  async savePlanFile(file: StoredPlanFile): Promise<void> {
+    this.planFiles.set(file.id, file);
+  }
+
+  async deletePlanFile(id: string): Promise<void> {
+    this.planFiles.delete(id);
+  }
 
   async getJobs(): Promise<PlumbingJob[]> {
     return this.read().jobs;

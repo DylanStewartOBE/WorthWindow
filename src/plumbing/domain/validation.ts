@@ -1,6 +1,6 @@
 import { formatInchesFraction, formatPipeSize } from "./math";
 import { isBeyondDemandTable } from "./sizing";
-import type { FixtureType, PlumbingConfig, PlumbingFlag, PlumbingJob, PlumbingTakeoff } from "./types";
+import type { FixtureType, PipeRun, PlumbingConfig, PlumbingFlag, PlumbingJob, PlumbingTakeoff } from "./types";
 
 /**
  * Advisory checks. Nothing here blocks output; errors mean the takeoff cannot be priced as entered.
@@ -9,16 +9,44 @@ export function validatePlumbingJob(
   job: PlumbingJob,
   takeoff: Omit<PlumbingTakeoff, "flags">,
   fixtures: Map<string, FixtureType>,
-  config: PlumbingConfig
+  config: PlumbingConfig,
+  runs: PipeRun[] = job.runs
 ): PlumbingFlag[] {
   const flags: PlumbingFlag[] = [];
   const add = (flag: Omit<PlumbingFlag, "id">) => flags.push({ id: `${flag.code}-${flags.length}`, ...flag });
   const rules = config.pipingRulePack;
   const pipeMaterials = new Map(rules.pipeMaterials.map((material) => [material.id, material]));
   const systemLabels = new Map(rules.systems.map((rule) => [rule.system, rule.label]));
-  const activeRuns = job.runs.filter((run) => run.lengthFt > 0);
+  const activeRuns = runs.filter((run) => run.lengthFt > 0);
   const scheduleTypes = takeoff.fixtureSchedule.map((line) => fixtures.get(line.fixtureTypeId)).filter(Boolean) as FixtureType[];
   const { sizing } = takeoff;
+
+  const unscaledRuns = takeoff.planRuns.filter((result) => !result.measured);
+  if (unscaledRuns.length > 0) {
+    const sheetIds = new Set(unscaledRuns.map((result) => result.sheetId));
+    add({
+      code: "PLAN_SHEET_NOT_SCALED",
+      severity: "error",
+      message: `${unscaledRuns.length} drawn run${unscaledRuns.length === 1 ? " is" : "s are"} on ${sheetIds.size} sheet${
+        sheetIds.size === 1 ? "" : "s"
+      } with no scale, so ${unscaledRuns.length === 1 ? "it is" : "they are"} not in the takeoff.`,
+      recommendation: "Set the sheet scale, or calibrate it by measuring a known dimension."
+    });
+  }
+
+  takeoff.planRuns.forEach((result) => {
+    const off = result.bends.filter((bend) => bend.offAngle);
+    if (off.length > 0) {
+      add({
+        code: "PLAN_BEND_OFF_ANGLE",
+        severity: "warning",
+        message: `${result.label}: ${off.length} bend${off.length === 1 ? " does" : "s do"} not match standard fittings (${off
+          .map((bend) => `${bend.angleDeg}°`)
+          .join(", ")}).`,
+        recommendation: "Redraw with angle snap on, or check the fittings for that turn."
+      });
+    }
+  });
 
   if (takeoff.fixtureCount === 0) {
     add({

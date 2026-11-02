@@ -55,7 +55,12 @@ export function getMissingRoughInChecks(job: PlumbingJob, fixtures: Map<string, 
   const missing: { areaId: string; fixtureTypeId: string; dimensionId: string }[] = [];
 
   job.areas.forEach((area) => {
-    const typeIds = [...new Set(area.fixtures.filter((line) => line.qty > 0).map((line) => line.fixtureTypeId))];
+    const typeIds = [
+      ...new Set([
+        ...area.fixtures.filter((line) => line.qty > 0).map((line) => line.fixtureTypeId),
+        ...(job.plans?.markers ?? []).filter((marker) => marker.areaId === area.id).map((marker) => marker.fixtureTypeId)
+      ])
+    ];
     typeIds.forEach((fixtureTypeId) => {
       fixtures.get(fixtureTypeId)?.roughIn.forEach((dimension) => {
         const key = `${area.id}|${fixtureTypeId}|${dimension.id}`;

@@ -5,6 +5,7 @@ import type {
   PipeSystem,
   PlumbingAllowance,
   PlumbingArea,
+  PlanSet,
   PlumbingJob,
   PlumbingRevision
 } from "./types";
@@ -33,8 +34,14 @@ export function createBlankPlumbingJob(createdBy = ""): PlumbingJob {
     runs: [],
     fieldChecks: [],
     allowances: [],
-    notes: ""
+    notes: "",
+    plans: emptyPlanSet(),
+    brandChoices: {}
   };
+}
+
+export function emptyPlanSet(): PlanSet {
+  return { files: [], sheets: [], runs: [], markers: [] };
 }
 
 export function createArea(name: string, level = "", multiplier = 1): PlumbingArea {
@@ -93,7 +100,14 @@ export function normalizePlumbingJob(job: Partial<PlumbingJob> & Pick<PlumbingJo
     areas: (job.areas ?? []).map((area) => ({ ...area, multiplier: area.multiplier || 1, fixtures: area.fixtures ?? [] })),
     runs: (job.runs ?? []).map((run) => ({ ...run, fittingCount: run.fittingCount ?? null })),
     fieldChecks: job.fieldChecks ?? [],
-    allowances: job.allowances ?? []
+    allowances: job.allowances ?? [],
+    plans: {
+      files: job.plans?.files ?? [],
+      sheets: job.plans?.sheets ?? [],
+      runs: job.plans?.runs ?? [],
+      markers: job.plans?.markers ?? []
+    },
+    brandChoices: job.brandChoices ?? {}
   };
 }
 
@@ -171,6 +185,8 @@ export function createSamplePlumbingJob(): PlumbingJob {
       { id: "chk-sample-tub", areaId: bath.id, fixtureTypeId: "tub-shower", dimensionId: "valve-height", measured: 28.5, note: "" }
     ],
     allowances: [{ id: "allow-sample-core", label: "Core drilling allowance", amount: 600 }],
-    notes: "Sample job: typical unit entered once and multiplied by 4."
+    notes: "Sample job: typical unit entered once and multiplied by 4.",
+    plans: emptyPlanSet(),
+    brandChoices: {}
   };
 }

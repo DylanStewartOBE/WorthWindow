@@ -130,7 +130,7 @@ export function Stepper({
 }
 
 /** Free-text numeric entry that only commits a value once it parses. */
-function ParsedField({
+export function ParsedField({
   label,
   value,
   format,

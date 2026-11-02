@@ -209,7 +209,7 @@ BT
 11.5 TL
 0.067 0.094 0.153 rg
 36. 410. Td
-($9,122.00) Tj
+($9,197.00) Tj
 ET
 BT
 /F1 7 Tf
@@ -237,7 +237,7 @@ BT
 11.5 TL
 0.067 0.094 0.153 rg
 516. 410. Td
-($58,465.92) Tj
+($58,568.61) Tj
 ET
 BT
 /F2 10 Tf
@@ -1014,7 +1014,7 @@ endobj
 endobj
 8 0 obj
 <<
-/Length 18871
+/Length 18905
 >>
 stream
 0.4 w
@@ -1181,7 +1181,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 508. 468. Td
-(1 x 100' coil \(incl. 10% waste\)) Tj
+(1 x 100' coil \(cut list, min 10%...) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -1242,7 +1242,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 508. 454. Td
-(7 x 20' sticks \(incl. 10% waste\)) Tj
+(7 x 20' sticks \(cut list, min 10...) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -1303,7 +1303,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 508. 440. Td
-(5 x 20' sticks \(incl. 10% waste\)) Tj
+(5 x 20' sticks \(cut list, min 10...) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -1336,7 +1336,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 144. 426. Td
-(PEX-A \(coil\) 1-1/4" fittings \(avg\)) Tj
+(PEX-A \(coil\) 1-1/4" fittings \(avg mix\)) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -1390,7 +1390,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 144. 412. Td
-(PVC Sch 40 DWV 3" fittings \(avg\)) Tj
+(PVC Sch 40 DWV 3" fittings \(avg mix\)) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -1444,7 +1444,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 144. 398. Td
-(PVC Sch 40 DWV 4" fittings \(avg\)) Tj
+(PVC Sch 40 DWV 4" fittings \(avg mix\)) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -2367,21 +2367,21 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 487.625 134. Td
-(500) Tj
+(600) Tj
 ET
 BT
 /F1 7.5 Tf
 8.625 TL
 0.067 0.094 0.153 rg
 508. 134. Td
-(5 x 100' coils \(incl. 10% waste\)) Tj
+(6 x 100' coils \(cut list, min 10...) Tj
 ET
 BT
 /F1 7.5 Tf
 8.625 TL
 0.067 0.094 0.153 rg
 663.1499999999999773 134. Td
-($375.00) Tj
+($450.00) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -2435,7 +2435,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 508. 120. Td
-(4 x 100' coils \(incl. 10% waste\)) Tj
+(4 x 100' coils \(cut list, min 10...) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -2496,7 +2496,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 508. 106. Td
-(5 x 20' sticks \(incl. 10% waste\)) Tj
+(5 x 20' sticks \(cut list, min 10...) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -2557,7 +2557,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 508. 92. Td
-(13 x 20' sticks \(incl. 10% waste\)) Tj
+(13 x 20' sticks \(cut list, min 1...) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -2590,7 +2590,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 144. 78. Td
-(PEX-A \(coil\) 1/2" fittings \(avg\)) Tj
+(PEX-A \(coil\) 1/2" fittings \(avg mix\)) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -2644,7 +2644,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 144. 64. Td
-(PEX-A \(coil\) 3/4" fittings \(avg\)) Tj
+(PEX-A \(coil\) 3/4" fittings \(avg mix\)) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -2698,7 +2698,7 @@ endobj
 endobj
 10 0 obj
 <<
-/Length 18943
+/Length 18951
 >>
 stream
 0.4 w
@@ -2830,7 +2830,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 144. 486. Td
-(PVC Sch 40 DWV 1-1/2" fittings \(avg\)) Tj
+(PVC Sch 40 DWV 1-1/2" fittings \(avg mix\)) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -2884,7 +2884,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 144. 472. Td
-(PVC Sch 40 DWV 2" fittings \(avg\)) Tj
+(PVC Sch 40 DWV 2" fittings \(avg mix\)) Tj
 ET
 BT
 /F1 7.5 Tf
@@ -3154,7 +3154,7 @@ BT
 8.625 TL
 0.067 0.094 0.153 rg
 656.9249999999999545 402. Td
-($5,838.00) Tj
+($5,913.00) Tj
 ET
 BT
 /F2 7.5 Tf
@@ -5964,6 +5964,397 @@ endobj
 endobj
 16 0 obj
 <<
+/Length 4477
+>>
+stream
+0.4 w
+0.89 0.91 0.94 RG
+0.07 0.09 0.15 RG
+1. w
+24. 588. 744. -564. re
+S
+0.28 0.4 0.18 rg
+24. 588. 744. -50. re
+f
+BT
+/F2 18 Tf
+20.6999999999999993 TL
+1. g
+36. 562. Td
+(Worth Construction) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+1. g
+36. 548. Td
+(PLUMBING TAKEOFF PACKAGE) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+1. g
+654.5599999999999454 568. Td
+(WP-1001  |  Sample fourplex) Tj
+ET
+BT
+/F1 8 Tf
+9.1999999999999993 TL
+1. g
+607.6000000000000227 556. Td
+(Sample Owner LLC  |  Rev A  |  11/2/2026) Tj
+ET
+BT
+/F2 14 Tf
+16.0999999999999979 TL
+0.067 0.094 0.153 rg
+36. 514. Td
+(Pipe Cut List) Tj
+ET
+BT
+/F1 7 Tf
+8.0499999999999989 TL
+0.392 0.455 0.545 rg
+685.0199999999999818 30. Td
+(Sheet PL-3B  |  Page 7) Tj
+ET
+BT
+/F1 7 Tf
+8.0499999999999989 TL
+0.392 0.455 0.545 rg
+36. 30. Td
+(Worth Construction plumbing takeoff - advisory estimate, field verify before fabrication) Tj
+ET
+0.95 0.96 0.98 rg
+36. 510. 720. -14. re
+f
+BT
+/F2 7 Tf
+8.0499999999999989 TL
+0.067 0.094 0.153 rg
+40. 500. Td
+(PIPE) Tj
+ET
+BT
+/F2 7 Tf
+8.0499999999999989 TL
+0.067 0.094 0.153 rg
+277.5699999999999932 500. Td
+(STOCK) Tj
+ET
+BT
+/F2 7 Tf
+8.0499999999999989 TL
+0.067 0.094 0.153 rg
+326.8000000000000114 500. Td
+(ORDER) Tj
+ET
+BT
+/F2 7 Tf
+8.0499999999999989 TL
+0.067 0.094 0.153 rg
+372.3700000000000045 500. Td
+(INSTALLED FT) Tj
+ET
+BT
+/F2 7 Tf
+8.0499999999999989 TL
+0.067 0.094 0.153 rg
+430. 500. Td
+(PIECES \(FT\)) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+40. 486. Td
+(1-1/4" PEX-A \(coil\)) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+288.1999999999999886 486. Td
+(100') Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+347.875 486. Td
+(1) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+413.75 486. Td
+(60) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+430. 486. Td
+(60) Tj
+ET
+0.89 0.91 0.94 RG
+0.4 w
+36. 482. m
+756. 482. l
+S
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+40. 472. Td
+(3/4" PEX-A \(coil\)) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+288.1999999999999886 472. Td
+(100') Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+347.875 472. Td
+(4) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+409.625 472. Td
+(280) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+430. 472. Td
+(40, 40, 40, 40, 30, 30, 30, 30) Tj
+ET
+0.89 0.91 0.94 RG
+0.4 w
+36. 468. m
+756. 468. l
+S
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+40. 458. Td
+(1/2" PEX-A \(coil\)) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+288.1999999999999886 458. Td
+(100') Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+347.875 458. Td
+(6) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+409.625 458. Td
+(440) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+430. 458. Td
+(60, 60, 60, 60, 50, 50, 50, 50) Tj
+ET
+0.89 0.91 0.94 RG
+0.4 w
+36. 454. m
+756. 454. l
+S
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+40. 444. Td
+(4" PVC Sch 40 DWV) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+292.3249999999999886 444. Td
+(20') Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+347.875 444. Td
+(5) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+413.75 444. Td
+(85) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+430. 444. Td
+(85) Tj
+ET
+0.89 0.91 0.94 RG
+0.4 w
+36. 440. m
+756. 440. l
+S
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+40. 430. Td
+(3" PVC Sch 40 DWV) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+292.3249999999999886 430. Td
+(20') Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+347.875 430. Td
+(7) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+409.625 430. Td
+(112) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+430. 430. Td
+(28, 28, 28, 28) Tj
+ET
+0.89 0.91 0.94 RG
+0.4 w
+36. 426. m
+756. 426. l
+S
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+40. 416. Td
+(2" PVC Sch 40 DWV) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+292.3249999999999886 416. Td
+(20') Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+343.75 416. Td
+(13) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+409.625 416. Td
+(232) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+430. 416. Td
+(40, 40, 40, 40, 18, 18, 18, 18) Tj
+ET
+0.89 0.91 0.94 RG
+0.4 w
+36. 412. m
+756. 412. l
+S
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+40. 402. Td
+(1-1/2" PVC Sch 40 DWV) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+292.3249999999999886 402. Td
+(20') Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+347.875 402. Td
+(5) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+413.75 402. Td
+(80) Tj
+ET
+BT
+/F1 7.5 Tf
+8.625 TL
+0.067 0.094 0.153 rg
+430. 402. Td
+(20, 20, 20, 20) Tj
+ET
+0.89 0.91 0.94 RG
+0.4 w
+36. 398. m
+756. 398. l
+S
+endstream
+endobj
+17 0 obj
+<</Type /Page
+/Parent 1 0 R
+/Resources 2 0 R
+/MediaBox [0 0 792. 612.]
+/Contents 18 0 R
+>>
+endobj
+18 0 obj
+<<
 /Length 3581
 >>
 stream
@@ -6016,7 +6407,7 @@ BT
 8.0499999999999989 TL
 0.392 0.455 0.545 rg
 689.6399999999999864 30. Td
-(Sheet PL-4  |  Page 7) Tj
+(Sheet PL-4  |  Page 8) Tj
 ET
 BT
 /F1 7 Tf
@@ -6250,11 +6641,11 @@ endstream
 endobj
 1 0 obj
 <</Type /Pages
-/Kids [3 0 R 5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R ]
-/Count 7
+/Kids [3 0 R 5 0 R 7 0 R 9 0 R 11 0 R 13 0 R 15 0 R 17 0 R ]
+/Count 8
 >>
 endobj
-17 0 obj
+19 0 obj
 <<
 /Type /Font
 /BaseFont /Helvetica
@@ -6264,7 +6655,7 @@ endobj
 /LastChar 255
 >>
 endobj
-18 0 obj
+20 0 obj
 <<
 /Type /Font
 /BaseFont /Helvetica-Bold
@@ -6274,7 +6665,7 @@ endobj
 /LastChar 255
 >>
 endobj
-19 0 obj
+21 0 obj
 <<
 /Type /Font
 /BaseFont /Helvetica-Oblique
@@ -6284,7 +6675,7 @@ endobj
 /LastChar 255
 >>
 endobj
-20 0 obj
+22 0 obj
 <<
 /Type /Font
 /BaseFont /Helvetica-BoldOblique
@@ -6294,7 +6685,7 @@ endobj
 /LastChar 255
 >>
 endobj
-21 0 obj
+23 0 obj
 <<
 /Type /Font
 /BaseFont /Courier
@@ -6304,7 +6695,7 @@ endobj
 /LastChar 255
 >>
 endobj
-22 0 obj
+24 0 obj
 <<
 /Type /Font
 /BaseFont /Courier-Bold
@@ -6314,7 +6705,7 @@ endobj
 /LastChar 255
 >>
 endobj
-23 0 obj
+25 0 obj
 <<
 /Type /Font
 /BaseFont /Courier-Oblique
@@ -6324,7 +6715,7 @@ endobj
 /LastChar 255
 >>
 endobj
-24 0 obj
+26 0 obj
 <<
 /Type /Font
 /BaseFont /Courier-BoldOblique
@@ -6334,7 +6725,7 @@ endobj
 /LastChar 255
 >>
 endobj
-25 0 obj
+27 0 obj
 <<
 /Type /Font
 /BaseFont /Times-Roman
@@ -6344,7 +6735,7 @@ endobj
 /LastChar 255
 >>
 endobj
-26 0 obj
+28 0 obj
 <<
 /Type /Font
 /BaseFont /Times-Bold
@@ -6354,7 +6745,7 @@ endobj
 /LastChar 255
 >>
 endobj
-27 0 obj
+29 0 obj
 <<
 /Type /Font
 /BaseFont /Times-Italic
@@ -6364,7 +6755,7 @@ endobj
 /LastChar 255
 >>
 endobj
-28 0 obj
+30 0 obj
 <<
 /Type /Font
 /BaseFont /Times-BoldItalic
@@ -6374,7 +6765,7 @@ endobj
 /LastChar 255
 >>
 endobj
-29 0 obj
+31 0 obj
 <<
 /Type /Font
 /BaseFont /ZapfDingbats
@@ -6383,7 +6774,7 @@ endobj
 /LastChar 255
 >>
 endobj
-30 0 obj
+32 0 obj
 <<
 /Type /Font
 /BaseFont /Symbol
@@ -6396,35 +6787,35 @@ endobj
 <<
 /ProcSet [/PDF /Text /ImageB /ImageC /ImageI]
 /Font <<
-/F1 17 0 R
-/F2 18 0 R
-/F3 19 0 R
-/F4 20 0 R
-/F5 21 0 R
-/F6 22 0 R
-/F7 23 0 R
-/F8 24 0 R
-/F9 25 0 R
-/F10 26 0 R
-/F11 27 0 R
-/F12 28 0 R
-/F13 29 0 R
-/F14 30 0 R
+/F1 19 0 R
+/F2 20 0 R
+/F3 21 0 R
+/F4 22 0 R
+/F5 23 0 R
+/F6 24 0 R
+/F7 25 0 R
+/F8 26 0 R
+/F9 27 0 R
+/F10 28 0 R
+/F11 29 0 R
+/F12 30 0 R
+/F13 31 0 R
+/F14 32 0 R
 >>
 /XObject <<
 >>
 >>
 endobj
-31 0 obj
+33 0 obj
 <<
 /Producer (jsPDF 4.2.1)
 /Title (WP-1001 Sample fourplex Takeoff package)
 /Subject (Worth plumbing takeoff)
 /Author (Worth Estimating)
-/CreationDate (D:20261102150910-00'00')
+/CreationDate (D:20261102155621-00'00')
 >>
 endobj
-32 0 obj
+34 0 obj
 <<
 /Type /Catalog
 /Pages 1 0 R
@@ -6433,47 +6824,49 @@ endobj
 >>
 endobj
 xref
-0 33
+0 35
 0000000000 65535 f 
-0000071671 00000 n 
-0000073532 00000 n 
+0000076350 00000 n 
+0000078218 00000 n 
 0000000015 00000 n 
 0000000120 00000 n 
 0000004001 00000 n 
 0000004106 00000 n 
 0000012159 00000 n 
 0000012264 00000 n 
-0000031188 00000 n 
-0000031294 00000 n 
-0000050291 00000 n 
-0000050398 00000 n 
-0000060572 00000 n 
-0000060679 00000 n 
-0000067930 00000 n 
-0000068037 00000 n 
-0000071767 00000 n 
-0000071893 00000 n 
-0000072024 00000 n 
-0000072158 00000 n 
-0000072296 00000 n 
-0000072420 00000 n 
-0000072549 00000 n 
-0000072681 00000 n 
-0000072817 00000 n 
-0000072945 00000 n 
-0000073072 00000 n 
-0000073201 00000 n 
-0000073334 00000 n 
-0000073436 00000 n 
-0000073785 00000 n 
-0000073981 00000 n 
+0000031222 00000 n 
+0000031328 00000 n 
+0000050333 00000 n 
+0000050440 00000 n 
+0000060614 00000 n 
+0000060721 00000 n 
+0000067972 00000 n 
+0000068079 00000 n 
+0000072609 00000 n 
+0000072716 00000 n 
+0000076453 00000 n 
+0000076579 00000 n 
+0000076710 00000 n 
+0000076844 00000 n 
+0000076982 00000 n 
+0000077106 00000 n 
+0000077235 00000 n 
+0000077367 00000 n 
+0000077503 00000 n 
+0000077631 00000 n 
+0000077758 00000 n 
+0000077887 00000 n 
+0000078020 00000 n 
+0000078122 00000 n 
+0000078471 00000 n 
+0000078667 00000 n 
 trailer
 <<
-/Size 33
-/Root 32 0 R
-/Info 31 0 R
-/ID [ <6F609B306616C9098207D33F6211C936> <6F609B306616C9098207D33F6211C936> ]
+/Size 35
+/Root 34 0 R
+/Info 33 0 R
+/ID [ <3B7051A13FD41D8C62838B06954A779B> <3B7051A13FD41D8C62838B06954A779B> ]
 >>
 startxref
-74085
+78771
 %%EOF

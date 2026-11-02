@@ -1,10 +1,10 @@
 Phase,Group,Description,Unit,Qty,Order qty,Order note,Unit cost,Ext cost,Labor hours
-Underground,Pipe,"PEX-A (coil) 1-1/4"" pipe",lf,60,100,1 x 100' coil (incl. 10% waste),3.60,360.00,2.4
-Underground,Pipe,"PVC Sch 40 DWV 3"" pipe",lf,112,140,7 x 20' sticks (incl. 10% waste),2.90,406.00,10.08
-Underground,Pipe,"PVC Sch 40 DWV 4"" pipe",lf,85,100,5 x 20' sticks (incl. 10% waste),4.10,410.00,9.35
-Underground,Fittings,"PEX-A (coil) 1-1/4"" fittings (avg)",ea,14,14,,22.00,308.00,2.1
-Underground,Fittings,"PVC Sch 40 DWV 3"" fittings (avg)",ea,24,24,,8.00,192.00,7.92
-Underground,Fittings,"PVC Sch 40 DWV 4"" fittings (avg)",ea,16,16,,14.00,224.00,6.4
+Underground,Pipe,"PEX-A (coil) 1-1/4"" pipe",lf,60,100,"1 x 100' coil (cut list, min 10% waste)",3.60,360.00,2.4
+Underground,Pipe,"PVC Sch 40 DWV 3"" pipe",lf,112,140,"7 x 20' sticks (cut list, min 10% waste)",2.90,406.00,10.08
+Underground,Pipe,"PVC Sch 40 DWV 4"" pipe",lf,85,100,"5 x 20' sticks (cut list, min 10% waste)",4.10,410.00,9.35
+Underground,Fittings,"PEX-A (coil) 1-1/4"" fittings (avg mix)",ea,14,14,,22.00,308.00,2.1
+Underground,Fittings,"PVC Sch 40 DWV 3"" fittings (avg mix)",ea,24,24,,8.00,192.00,7.92
+Underground,Fittings,"PVC Sch 40 DWV 4"" fittings (avg mix)",ea,16,16,,14.00,224.00,6.4
 Rough-in,Rough-in labor,Bathtub / tub-shower - rough-in,ea,4,4,,0.00,0.00,14
 Rough-in,Rough-in labor,Clothes washer outlet box - rough-in,ea,4,4,,0.00,0.00,6
 Rough-in,Rough-in labor,Dishwasher connection - rough-in,ea,4,4,,0.00,0.00,2
@@ -28,14 +28,14 @@ Rough-in,Rough-in kits,Tub waste & overflow,ea,4,4,,65.00,260.00,0
 Rough-in,Rough-in kits,Washer outlet box w/ valves,ea,4,4,,55.00,220.00,0
 Rough-in,Rough-in kits,Water hammer arrestor,ea,8,8,,22.00,176.00,0
 Rough-in,Rough-in kits,Water heater drain pan,ea,4,4,,30.00,120.00,0
-Rough-in,Pipe,"PEX-A (coil) 1/2"" pipe",lf,440,500,5 x 100' coils (incl. 10% waste),0.75,375.00,11
-Rough-in,Pipe,"PEX-A (coil) 3/4"" pipe",lf,280,400,4 x 100' coils (incl. 10% waste),1.25,500.00,8.4
-Rough-in,Pipe,"PVC Sch 40 DWV 1-1/2"" pipe",lf,80,100,5 x 20' sticks (incl. 10% waste),1.10,110.00,4.8
-Rough-in,Pipe,"PVC Sch 40 DWV 2"" pipe",lf,232,260,13 x 20' sticks (incl. 10% waste),1.45,377.00,16.24
-Rough-in,Fittings,"PEX-A (coil) 1/2"" fittings (avg)",ea,100,100,,4.50,450.00,8
-Rough-in,Fittings,"PEX-A (coil) 3/4"" fittings (avg)",ea,64,64,,7.00,448.00,6.4
-Rough-in,Fittings,"PVC Sch 40 DWV 1-1/2"" fittings (avg)",ea,12,12,,2.50,30.00,2.4
-Rough-in,Fittings,"PVC Sch 40 DWV 2"" fittings (avg)",ea,40,40,,3.50,140.00,10
+Rough-in,Pipe,"PEX-A (coil) 1/2"" pipe",lf,440,600,"6 x 100' coils (cut list, min 10% waste)",0.75,450.00,11
+Rough-in,Pipe,"PEX-A (coil) 3/4"" pipe",lf,280,400,"4 x 100' coils (cut list, min 10% waste)",1.25,500.00,8.4
+Rough-in,Pipe,"PVC Sch 40 DWV 1-1/2"" pipe",lf,80,100,"5 x 20' sticks (cut list, min 10% waste)",1.10,110.00,4.8
+Rough-in,Pipe,"PVC Sch 40 DWV 2"" pipe",lf,232,260,"13 x 20' sticks (cut list, min 10% waste)",1.45,377.00,16.24
+Rough-in,Fittings,"PEX-A (coil) 1/2"" fittings (avg mix)",ea,100,100,,4.50,450.00,8
+Rough-in,Fittings,"PEX-A (coil) 3/4"" fittings (avg mix)",ea,64,64,,7.00,448.00,6.4
+Rough-in,Fittings,"PVC Sch 40 DWV 1-1/2"" fittings (avg mix)",ea,12,12,,2.50,30.00,2.4
+Rough-in,Fittings,"PVC Sch 40 DWV 2"" fittings (avg mix)",ea,40,40,,3.50,140.00,10
 Rough-in,Hangers & supports,"Hanger / strap, plastic pipe",ea,80,80,,3.50,280.00,12
 Rough-in,Hangers & supports,PEX clip / strap,ea,276,276,,1.00,276.00,13.8
 Rough-in,Insulation,"Pipe insulation, 1/2"" wall for 1/2"" pipe",lf,200,200,,2.75,550.00,6

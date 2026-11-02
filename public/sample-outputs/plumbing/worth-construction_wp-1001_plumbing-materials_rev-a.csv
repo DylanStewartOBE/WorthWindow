@@ -1,0 +1,74 @@
+Phase,Group,Description,Unit,Qty,Order qty,Order note,Unit cost,Ext cost,Labor hours
+Underground,Pipe,"PEX-A (coil) 1-1/4"" pipe",lf,60,100,1 x 100' coil (incl. 10% waste),3.60,360.00,2.4
+Underground,Pipe,"PVC Sch 40 DWV 3"" pipe",lf,112,140,7 x 20' sticks (incl. 10% waste),2.90,406.00,10.08
+Underground,Pipe,"PVC Sch 40 DWV 4"" pipe",lf,85,100,5 x 20' sticks (incl. 10% waste),4.10,410.00,9.35
+Underground,Fittings,"PEX-A (coil) 1-1/4"" fittings (avg)",ea,14,14,,22.00,308.00,2.1
+Underground,Fittings,"PVC Sch 40 DWV 3"" fittings (avg)",ea,24,24,,8.00,192.00,7.92
+Underground,Fittings,"PVC Sch 40 DWV 4"" fittings (avg)",ea,16,16,,14.00,224.00,6.4
+Rough-in,Rough-in labor,Bathtub / tub-shower - rough-in,ea,4,4,,0.00,0.00,14
+Rough-in,Rough-in labor,Clothes washer outlet box - rough-in,ea,4,4,,0.00,0.00,6
+Rough-in,Rough-in labor,Dishwasher connection - rough-in,ea,4,4,,0.00,0.00,2
+Rough-in,Rough-in labor,"Hose bibb, frost-free - rough-in",ea,2,2,,0.00,0.00,2
+Rough-in,Rough-in labor,Ice maker / refrigerator box - rough-in,ea,4,4,,0.00,0.00,3
+Rough-in,Rough-in labor,Kitchen sink - rough-in,ea,4,4,,0.00,0.00,6
+Rough-in,Rough-in labor,Lavatory - rough-in,ea,4,4,,0.00,0.00,6
+Rough-in,Rough-in labor,"Water closet, tank type - rough-in",ea,4,4,,0.00,0.00,8
+Rough-in,Rough-in labor,"Water heater, electric tank 50 gal - rough-in",ea,4,4,,0.00,0.00,6
+Rough-in,Rough-in kits,"1-1/2"" DWV P-trap",ea,4,4,,9.00,36.00,0
+Rough-in,Rough-in kits,"1-1/2"" san-tee & trap adapter stub",ea,8,8,,9.00,72.00,0
+Rough-in,Rough-in kits,"1/2"" drop-ear elbow",ea,8,8,,7.00,56.00,0
+Rough-in,Rough-in kits,"1/2"" supply stub-out w/ test cap",ea,24,24,,6.50,156.00,0
+Rough-in,Rough-in kits,"3/4"" ball valve",ea,4,4,,18.00,72.00,0
+Rough-in,Rough-in kits,Closet flange 3x4 PVC,ea,4,4,,18.00,72.00,0
+Rough-in,Rough-in kits,Frost-free hose bibb w/ vacuum breaker,ea,2,2,,48.00,96.00,0
+Rough-in,Rough-in kits,Ice maker outlet box,ea,4,4,,35.00,140.00,0
+Rough-in,Rough-in kits,Pressure-balance valve body (rough),ea,4,4,,120.00,480.00,0
+Rough-in,Rough-in kits,Stub-out bracket,ea,4,4,,4.00,16.00,0
+Rough-in,Rough-in kits,Tub waste & overflow,ea,4,4,,65.00,260.00,0
+Rough-in,Rough-in kits,Washer outlet box w/ valves,ea,4,4,,55.00,220.00,0
+Rough-in,Rough-in kits,Water hammer arrestor,ea,8,8,,22.00,176.00,0
+Rough-in,Rough-in kits,Water heater drain pan,ea,4,4,,30.00,120.00,0
+Rough-in,Pipe,"PEX-A (coil) 1/2"" pipe",lf,440,500,5 x 100' coils (incl. 10% waste),0.75,375.00,11
+Rough-in,Pipe,"PEX-A (coil) 3/4"" pipe",lf,280,400,4 x 100' coils (incl. 10% waste),1.25,500.00,8.4
+Rough-in,Pipe,"PVC Sch 40 DWV 1-1/2"" pipe",lf,80,100,5 x 20' sticks (incl. 10% waste),1.10,110.00,4.8
+Rough-in,Pipe,"PVC Sch 40 DWV 2"" pipe",lf,232,260,13 x 20' sticks (incl. 10% waste),1.45,377.00,16.24
+Rough-in,Fittings,"PEX-A (coil) 1/2"" fittings (avg)",ea,100,100,,4.50,450.00,8
+Rough-in,Fittings,"PEX-A (coil) 3/4"" fittings (avg)",ea,64,64,,7.00,448.00,6.4
+Rough-in,Fittings,"PVC Sch 40 DWV 1-1/2"" fittings (avg)",ea,12,12,,2.50,30.00,2.4
+Rough-in,Fittings,"PVC Sch 40 DWV 2"" fittings (avg)",ea,40,40,,3.50,140.00,10
+Rough-in,Hangers & supports,"Hanger / strap, plastic pipe",ea,80,80,,3.50,280.00,12
+Rough-in,Hangers & supports,PEX clip / strap,ea,276,276,,1.00,276.00,13.8
+Rough-in,Insulation,"Pipe insulation, 1/2"" wall for 1/2"" pipe",lf,200,200,,2.75,550.00,6
+Rough-in,Insulation,"Pipe insulation, 1/2"" wall for 3/4"" pipe",lf,120,120,,2.75,330.00,3.6
+Set & trim,Fixtures & equipment,Bathtub / tub-shower,ea,4,4,,650.00,2600.00,0
+Set & trim,Fixtures & equipment,Clothes washer outlet box (furnished by others),ea,4,4,Install only,0.00,0.00,0
+Set & trim,Fixtures & equipment,Dishwasher connection (furnished by others),ea,4,4,Install only,0.00,0.00,0
+Set & trim,Fixtures & equipment,"Hose bibb, frost-free",ea,2,2,,0.00,0.00,0
+Set & trim,Fixtures & equipment,Ice maker / refrigerator box (furnished by others),ea,4,4,Install only,0.00,0.00,0
+Set & trim,Fixtures & equipment,Kitchen sink,ea,4,4,,450.00,1800.00,0
+Set & trim,Fixtures & equipment,Lavatory,ea,4,4,,275.00,1100.00,0
+Set & trim,Fixtures & equipment,"Water closet, tank type",ea,4,4,,325.00,1300.00,0
+Set & trim,Fixtures & equipment,"Water heater, electric tank 50 gal",ea,4,4,,1100.00,4400.00,0
+Set & trim,Set & trim labor,Bathtub / tub-shower - set & trim,ea,4,4,,0.00,0.00,6
+Set & trim,Set & trim labor,Clothes washer outlet box - set & trim,ea,4,4,,0.00,0.00,1
+Set & trim,Set & trim labor,Dishwasher connection - set & trim,ea,4,4,,0.00,0.00,4
+Set & trim,Set & trim labor,"Hose bibb, frost-free - set & trim",ea,2,2,,0.00,0.00,0.5
+Set & trim,Set & trim labor,Ice maker / refrigerator box - set & trim,ea,4,4,,0.00,0.00,1
+Set & trim,Set & trim labor,Kitchen sink - set & trim,ea,4,4,,0.00,0.00,6
+Set & trim,Set & trim labor,Lavatory - set & trim,ea,4,4,,0.00,0.00,5
+Set & trim,Set & trim labor,"Water closet, tank type - set & trim",ea,4,4,,0.00,0.00,4
+Set & trim,Set & trim labor,"Water heater, electric tank 50 gal - set & trim",ea,4,4,,0.00,0.00,10
+Set & trim,Trim kits,"1-1/2"" P-trap kit (sink)",ea,4,4,,16.00,64.00,0
+Set & trim,Trim kits,"1-1/4"" P-trap kit (lav)",ea,4,4,,14.00,56.00,0
+Set & trim,Trim kits,"1/2"" x 3/8"" quarter-turn angle stop",ea,20,20,,12.00,240.00,0
+Set & trim,Trim kits,"3/8"" braided faucet supply",ea,16,16,,9.00,144.00,0
+Set & trim,Trim kits,Braided toilet supply,ea,4,4,,9.00,36.00,0
+Set & trim,Trim kits,Dishwasher supply & 90 elbow,ea,4,4,,22.00,88.00,0
+Set & trim,Trim kits,Double-bowl continuous waste,ea,4,4,,18.00,72.00,0
+Set & trim,Trim kits,Escutcheon,ea,28,28,,2.00,56.00,0
+Set & trim,Trim kits,Ice maker supply line,ea,4,4,,18.00,72.00,0
+Set & trim,Trim kits,Sealant / setting consumables,ea,4,4,,8.00,32.00,0
+Set & trim,Trim kits,T&P discharge piping,ea,4,4,,25.00,100.00,0
+Set & trim,Trim kits,Thermal expansion tank,ea,4,4,,65.00,260.00,0
+Set & trim,Trim kits,Water heater connector,ea,8,8,,16.00,128.00,0
+Set & trim,Trim kits,Wax ring & closet bolts,ea,4,4,,9.00,36.00,0

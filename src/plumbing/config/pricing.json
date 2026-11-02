@@ -1,0 +1,22 @@
+{
+  "id": "worth-plumbing-pricing",
+  "name": "Worth Plumbing Budget Pricing",
+  "version": "0.1.0",
+  "effectiveDate": "2026-11-02",
+  "owner": "Worth Construction Plumbing",
+  "laborRatePerHour": 95,
+  "materialTaxPercent": 8.25,
+  "overheadPercent": 10,
+  "marginPercent": 15,
+  "permitFee": 450,
+  "testAndInspectHoursPerFixture": 0.25,
+  "mobilizationHours": 4,
+  "assumptions": [
+    "Budgetary plumbing estimate built from fixture counts, entered pipe runs, and Worth rule-pack labor units.",
+    "Fixtures marked 'by others' are installed only; the fixture price is excluded.",
+    "Pipe quantities include the rule-pack waste factor and are rounded up to full sticks or coils for ordering."
+  ],
+  "exclusions": [
+    "Excludes engineering, sewer/water tap and impact fees, utility company work, excavation beyond the plumbing trench, concrete cutting and patching, fire protection, and conditions not captured in this takeoff."
+  ]
+}

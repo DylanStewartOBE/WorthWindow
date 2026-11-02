@@ -9,7 +9,8 @@
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run",
     "test:watch": "vitest",
-    "sample:pdf": "tsx scripts/generate-sample-outputs.ts"
+    "sample:pdf": "tsx scripts/generate-sample-outputs.ts",
+    "sample:plumbing": "tsx scripts/generate-plumbing-samples.ts"
   },
   "dependencies": {
     "@vitejs/plugin-react": "^5.1.1",

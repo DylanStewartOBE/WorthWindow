@@ -11,6 +11,7 @@ Offline-first, iPhone-first field measuring app for interior FG-2000 storefront 
 - `src/app` is the responsive PWA UI: guided wizard, validation review, revision actions, export, and a lightweight admin config view.
 - `src/data` contains seed jobs/elevations for a pair-door storefront and a no-door storefront.
 - `tests` covers the core math and revision behavior.
+- `src/plumbing` is the separate plumbing takeoff engine and workspace. See [docs/PLUMBING_TAKEOFF.md](docs/PLUMBING_TAKEOFF.md).
 
 ## Run Locally
 
@@ -27,9 +28,10 @@ npm run dev
 npm test
 npm run build
 npm run sample:pdf
+npm run sample:plumbing
 ```
 
-Sample PDFs are generated into `public/sample-outputs`.
+Sample PDFs are generated into `public/sample-outputs` (plumbing samples in `public/sample-outputs/plumbing`).
 
 ## V1 Scope
 

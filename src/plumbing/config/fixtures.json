@@ -1,0 +1,561 @@
+{
+  "id": "worth-plumbing-fixtures",
+  "name": "Worth Plumbing Fixture Library",
+  "version": "0.1.0",
+  "source": "DFU defaults from IPC Table 709.1 / 709.2 and WSFU defaults from IPC Appendix E Table E103.3(2). Rough-in dimensions are typical values; confirm against the approved fixture cut sheets and the adopted code edition.",
+  "fixtures": [
+    {
+      "id": "wc-tank",
+      "label": "Water closet, tank type",
+      "shortLabel": "WC",
+      "category": "fixture",
+      "dfu": 3,
+      "wsfu": { "cold": 2.2, "hot": 0, "total": 2.2 },
+      "publicUse": { "dfu": 4, "wsfu": { "cold": 5, "hot": 0, "total": 5 } },
+      "flushValve": false,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": null,
+      "minDrainSize": 3,
+      "needsHotWater": false,
+      "needsGas": false,
+      "roughLaborHours": 2,
+      "trimLaborHours": 1,
+      "fixtureAllowance": 325,
+      "roughKit": [
+        { "materialId": "closet-flange-3x4", "qty": 1 },
+        { "materialId": "stub-out-half", "qty": 1 }
+      ],
+      "trimKit": [
+        { "materialId": "angle-stop-half", "qty": 1 },
+        { "materialId": "supply-wc", "qty": 1 },
+        { "materialId": "wax-ring-bolts", "qty": 1 },
+        { "materialId": "escutcheon", "qty": 1 }
+      ],
+      "roughIn": [
+        { "id": "drain-from-wall", "label": "Drain CL from finished wall", "reference": "Finished back wall to center of closet flange", "min": 11.5, "target": 12, "max": 12.5 },
+        { "id": "supply-height", "label": "Supply stub height", "reference": "Finished floor to supply CL", "min": 5, "target": 6, "max": 9 },
+        { "id": "supply-offset", "label": "Supply offset from drain CL", "reference": "Drain CL to supply CL, horizontal", "min": 5, "target": 6, "max": 7.5 }
+      ]
+    },
+    {
+      "id": "wc-flushometer",
+      "label": "Water closet, floor-mount flushometer",
+      "shortLabel": "WC-FV",
+      "category": "fixture",
+      "dfu": 4,
+      "wsfu": { "cold": 10, "hot": 0, "total": 10 },
+      "flushValve": true,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": null,
+      "minDrainSize": 3,
+      "needsHotWater": false,
+      "needsGas": false,
+      "roughLaborHours": 2.5,
+      "trimLaborHours": 1.5,
+      "fixtureAllowance": 650,
+      "roughKit": [
+        { "materialId": "closet-flange-3x4", "qty": 1 },
+        { "materialId": "stub-out-1in", "qty": 1 }
+      ],
+      "trimKit": [
+        { "materialId": "wax-ring-bolts", "qty": 1 },
+        { "materialId": "escutcheon", "qty": 1 }
+      ],
+      "roughIn": [
+        { "id": "drain-from-wall", "label": "Drain CL from finished wall", "reference": "Finished back wall to center of closet flange", "min": 11.5, "target": 12, "max": 12.5 }
+      ]
+    },
+    {
+      "id": "wc-wall-hung",
+      "label": "Water closet, wall-hung on carrier",
+      "shortLabel": "WC-WH",
+      "category": "fixture",
+      "dfu": 4,
+      "wsfu": { "cold": 10, "hot": 0, "total": 10 },
+      "flushValve": true,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": null,
+      "minDrainSize": 3,
+      "needsHotWater": false,
+      "needsGas": false,
+      "roughLaborHours": 3.5,
+      "trimLaborHours": 1.5,
+      "fixtureAllowance": 750,
+      "roughKit": [
+        { "materialId": "wc-carrier", "qty": 1 },
+        { "materialId": "stub-out-1in", "qty": 1 }
+      ],
+      "trimKit": [
+        { "materialId": "caulk-sealant", "qty": 1 },
+        { "materialId": "escutcheon", "qty": 1 }
+      ],
+      "roughIn": []
+    },
+    {
+      "id": "urinal",
+      "label": "Urinal, flush valve (1 gpf or less)",
+      "shortLabel": "UR",
+      "category": "fixture",
+      "dfu": 2,
+      "wsfu": { "cold": 5, "hot": 0, "total": 5 },
+      "flushValve": true,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": 2,
+      "minDrainSize": 2,
+      "needsHotWater": false,
+      "needsGas": false,
+      "roughLaborHours": 2.5,
+      "trimLaborHours": 1.25,
+      "fixtureAllowance": 550,
+      "roughKit": [
+        { "materialId": "urinal-carrier", "qty": 1 },
+        { "materialId": "trap-arm-2", "qty": 1 },
+        { "materialId": "stub-out-3-4", "qty": 1 }
+      ],
+      "trimKit": [
+        { "materialId": "escutcheon", "qty": 1 }
+      ],
+      "roughIn": [
+        { "id": "outlet-height", "label": "Waste outlet CL height", "reference": "Finished floor to waste outlet CL (confirm with urinal cut sheet)", "min": 13, "target": 17, "max": 22 }
+      ]
+    },
+    {
+      "id": "lavatory",
+      "label": "Lavatory",
+      "shortLabel": "LAV",
+      "category": "fixture",
+      "dfu": 1,
+      "wsfu": { "cold": 0.5, "hot": 0.5, "total": 0.7 },
+      "publicUse": { "wsfu": { "cold": 1.5, "hot": 1.5, "total": 2 } },
+      "flushValve": false,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": 1.25,
+      "minDrainSize": 1.5,
+      "needsHotWater": true,
+      "needsGas": false,
+      "roughLaborHours": 1.5,
+      "trimLaborHours": 1.25,
+      "fixtureAllowance": 275,
+      "roughKit": [
+        { "materialId": "trap-arm-1-5", "qty": 1 },
+        { "materialId": "stub-out-half", "qty": 2 },
+        { "materialId": "stub-out-bracket", "qty": 1 }
+      ],
+      "trimKit": [
+        { "materialId": "angle-stop-half", "qty": 2 },
+        { "materialId": "supply-riser", "qty": 2 },
+        { "materialId": "p-trap-1-25", "qty": 1 },
+        { "materialId": "escutcheon", "qty": 3 }
+      ],
+      "roughIn": [
+        { "id": "drain-height", "label": "Drain stub height", "reference": "Finished floor to trap arm CL", "min": 16, "target": 18, "max": 20 },
+        { "id": "supply-height", "label": "Supply stub height", "reference": "Finished floor to supply CL", "min": 19, "target": 21, "max": 23 },
+        { "id": "supply-spread", "label": "Hot to cold supply spacing", "reference": "Center to center of supply stubs", "min": 6, "target": 8, "max": 10 }
+      ]
+    },
+    {
+      "id": "kitchen-sink",
+      "label": "Kitchen sink",
+      "shortLabel": "KS",
+      "category": "fixture",
+      "dfu": 2,
+      "wsfu": { "cold": 1, "hot": 1, "total": 1.4 },
+      "publicUse": { "wsfu": { "cold": 3, "hot": 3, "total": 4 } },
+      "flushValve": false,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": 1.5,
+      "minDrainSize": 1.5,
+      "needsHotWater": true,
+      "needsGas": false,
+      "roughLaborHours": 1.5,
+      "trimLaborHours": 1.5,
+      "fixtureAllowance": 450,
+      "roughKit": [
+        { "materialId": "trap-arm-1-5", "qty": 1 },
+        { "materialId": "stub-out-half", "qty": 2 }
+      ],
+      "trimKit": [
+        { "materialId": "angle-stop-half", "qty": 2 },
+        { "materialId": "supply-riser", "qty": 2 },
+        { "materialId": "p-trap-1-5", "qty": 1 },
+        { "materialId": "sink-continuous-waste", "qty": 1 },
+        { "materialId": "escutcheon", "qty": 3 }
+      ],
+      "roughIn": [
+        { "id": "drain-height", "label": "Drain stub height", "reference": "Finished floor to trap arm CL", "min": 14, "target": 16, "max": 20 },
+        { "id": "supply-height", "label": "Supply stub height", "reference": "Finished floor to supply CL", "min": 18, "target": 20, "max": 22 }
+      ]
+    },
+    {
+      "id": "bar-sink",
+      "label": "Bar / prep sink",
+      "shortLabel": "BS",
+      "category": "fixture",
+      "dfu": 2,
+      "wsfu": { "cold": 1, "hot": 1, "total": 1.4 },
+      "flushValve": false,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": 1.5,
+      "minDrainSize": 1.5,
+      "needsHotWater": true,
+      "needsGas": false,
+      "roughLaborHours": 1.25,
+      "trimLaborHours": 1,
+      "fixtureAllowance": 300,
+      "roughKit": [
+        { "materialId": "trap-arm-1-5", "qty": 1 },
+        { "materialId": "stub-out-half", "qty": 2 }
+      ],
+      "trimKit": [
+        { "materialId": "angle-stop-half", "qty": 2 },
+        { "materialId": "supply-riser", "qty": 2 },
+        { "materialId": "p-trap-1-5", "qty": 1 },
+        { "materialId": "escutcheon", "qty": 3 }
+      ],
+      "roughIn": [
+        { "id": "drain-height", "label": "Drain stub height", "reference": "Finished floor to trap arm CL", "min": 14, "target": 16, "max": 20 },
+        { "id": "supply-height", "label": "Supply stub height", "reference": "Finished floor to supply CL", "min": 18, "target": 20, "max": 22 }
+      ]
+    },
+    {
+      "id": "shower",
+      "label": "Shower",
+      "shortLabel": "SH",
+      "category": "fixture",
+      "dfu": 2,
+      "wsfu": { "cold": 1, "hot": 1, "total": 1.4 },
+      "publicUse": { "wsfu": { "cold": 3, "hot": 3, "total": 4 } },
+      "flushValve": false,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": 2,
+      "minDrainSize": 2,
+      "needsHotWater": true,
+      "needsGas": false,
+      "roughLaborHours": 3,
+      "trimLaborHours": 1,
+      "fixtureAllowance": 450,
+      "roughKit": [
+        { "materialId": "shower-drain", "qty": 1 },
+        { "materialId": "p-trap-2-dwv", "qty": 1 },
+        { "materialId": "shower-valve", "qty": 1 },
+        { "materialId": "drop-ear-elbow-half", "qty": 1 }
+      ],
+      "trimKit": [
+        { "materialId": "caulk-sealant", "qty": 1 }
+      ],
+      "roughIn": [
+        { "id": "valve-height", "label": "Valve CL height", "reference": "Finished floor to valve CL", "min": 42, "target": 48, "max": 50 },
+        { "id": "head-height", "label": "Shower head outlet height", "reference": "Finished floor to drop-ear elbow CL", "min": 76, "target": 80, "max": 84 }
+      ]
+    },
+    {
+      "id": "tub-shower",
+      "label": "Bathtub / tub-shower",
+      "shortLabel": "TUB",
+      "category": "fixture",
+      "dfu": 2,
+      "wsfu": { "cold": 1, "hot": 1, "total": 1.4 },
+      "publicUse": { "wsfu": { "cold": 3, "hot": 3, "total": 4 } },
+      "flushValve": false,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": 1.5,
+      "minDrainSize": 1.5,
+      "needsHotWater": true,
+      "needsGas": false,
+      "roughLaborHours": 3.5,
+      "trimLaborHours": 1.5,
+      "fixtureAllowance": 650,
+      "roughKit": [
+        { "materialId": "tub-waste-overflow", "qty": 1 },
+        { "materialId": "p-trap-1-5-dwv", "qty": 1 },
+        { "materialId": "shower-valve", "qty": 1 },
+        { "materialId": "drop-ear-elbow-half", "qty": 2 }
+      ],
+      "trimKit": [
+        { "materialId": "caulk-sealant", "qty": 1 }
+      ],
+      "roughIn": [
+        { "id": "valve-height", "label": "Valve CL height", "reference": "Finished floor to valve CL", "min": 26, "target": 28, "max": 34 },
+        { "id": "spout-height", "label": "Tub spout outlet height", "reference": "Finished floor to spout outlet CL", "min": 17, "target": 20, "max": 24 },
+        { "id": "head-height", "label": "Shower head outlet height", "reference": "Finished floor to drop-ear elbow CL", "min": 72, "target": 78, "max": 84 }
+      ]
+    },
+    {
+      "id": "mop-sink",
+      "label": "Mop basin / service sink (2\" trap)",
+      "shortLabel": "MS",
+      "category": "fixture",
+      "dfu": 3,
+      "wsfu": { "cold": 2.25, "hot": 2.25, "total": 3 },
+      "flushValve": false,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": 2,
+      "minDrainSize": 2,
+      "needsHotWater": true,
+      "needsGas": false,
+      "roughLaborHours": 2,
+      "trimLaborHours": 1.5,
+      "fixtureAllowance": 650,
+      "roughKit": [
+        { "materialId": "p-trap-2-dwv", "qty": 1 },
+        { "materialId": "stub-out-half", "qty": 2 }
+      ],
+      "trimKit": [
+        { "materialId": "escutcheon", "qty": 2 },
+        { "materialId": "caulk-sealant", "qty": 1 }
+      ],
+      "roughIn": []
+    },
+    {
+      "id": "drinking-fountain",
+      "label": "Drinking fountain / bottle filler",
+      "shortLabel": "DF",
+      "category": "fixture",
+      "dfu": 0.5,
+      "wsfu": { "cold": 0.25, "hot": 0, "total": 0.25 },
+      "flushValve": false,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": 1.25,
+      "minDrainSize": 1.5,
+      "needsHotWater": false,
+      "needsGas": false,
+      "roughLaborHours": 2,
+      "trimLaborHours": 2,
+      "fixtureAllowance": 1800,
+      "roughKit": [
+        { "materialId": "df-mounting-frame", "qty": 1 },
+        { "materialId": "trap-arm-1-5", "qty": 1 },
+        { "materialId": "stub-out-half", "qty": 1 }
+      ],
+      "trimKit": [
+        { "materialId": "angle-stop-half", "qty": 1 },
+        { "materialId": "supply-riser", "qty": 1 },
+        { "materialId": "p-trap-1-25", "qty": 1 }
+      ],
+      "roughIn": []
+    },
+    {
+      "id": "floor-drain",
+      "label": "Floor drain",
+      "shortLabel": "FD",
+      "category": "drain",
+      "dfu": 2,
+      "wsfu": { "cold": 0, "hot": 0, "total": 0 },
+      "flushValve": false,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": 2,
+      "minDrainSize": 2,
+      "needsHotWater": false,
+      "needsGas": false,
+      "roughLaborHours": 2,
+      "trimLaborHours": 0.25,
+      "fixtureAllowance": 0,
+      "roughKit": [
+        { "materialId": "floor-drain-body", "qty": 1 },
+        { "materialId": "p-trap-2-dwv", "qty": 1 },
+        { "materialId": "trap-seal-protection", "qty": 1 }
+      ],
+      "trimKit": [],
+      "roughIn": []
+    },
+    {
+      "id": "washer-box",
+      "label": "Clothes washer outlet box",
+      "shortLabel": "CW",
+      "category": "appliance",
+      "dfu": 2,
+      "wsfu": { "cold": 1, "hot": 1, "total": 1.4 },
+      "publicUse": { "dfu": 3, "wsfu": { "cold": 2.25, "hot": 2.25, "total": 3 } },
+      "flushValve": false,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "others",
+      "minTrapSize": 2,
+      "minDrainSize": 2,
+      "needsHotWater": true,
+      "needsGas": false,
+      "roughLaborHours": 1.5,
+      "trimLaborHours": 0.25,
+      "fixtureAllowance": 0,
+      "roughKit": [
+        { "materialId": "washer-box", "qty": 1 },
+        { "materialId": "water-hammer-arrestor", "qty": 2 }
+      ],
+      "trimKit": [],
+      "roughIn": [
+        { "id": "box-height", "label": "Outlet box CL height", "reference": "Finished floor to center of box", "min": 36, "target": 42, "max": 48 }
+      ]
+    },
+    {
+      "id": "dishwasher",
+      "label": "Dishwasher connection",
+      "shortLabel": "DW",
+      "category": "appliance",
+      "dfu": 2,
+      "wsfu": { "cold": 0, "hot": 1.4, "total": 1.4 },
+      "flushValve": false,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "others",
+      "minTrapSize": 1.5,
+      "minDrainSize": 1.5,
+      "needsHotWater": true,
+      "needsGas": false,
+      "roughLaborHours": 0.5,
+      "trimLaborHours": 1,
+      "fixtureAllowance": 0,
+      "roughKit": [
+        { "materialId": "stub-out-half", "qty": 1 }
+      ],
+      "trimKit": [
+        { "materialId": "dishwasher-supply-kit", "qty": 1 }
+      ],
+      "roughIn": []
+    },
+    {
+      "id": "icemaker",
+      "label": "Ice maker / refrigerator box",
+      "shortLabel": "IM",
+      "category": "appliance",
+      "dfu": 0,
+      "wsfu": { "cold": 0.25, "hot": 0, "total": 0.25 },
+      "flushValve": false,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "others",
+      "minTrapSize": null,
+      "minDrainSize": null,
+      "needsHotWater": false,
+      "needsGas": false,
+      "roughLaborHours": 0.75,
+      "trimLaborHours": 0.25,
+      "fixtureAllowance": 0,
+      "roughKit": [
+        { "materialId": "icemaker-box", "qty": 1 }
+      ],
+      "trimKit": [
+        { "materialId": "ice-supply-line", "qty": 1 }
+      ],
+      "roughIn": []
+    },
+    {
+      "id": "hose-bibb",
+      "label": "Hose bibb, frost-free",
+      "shortLabel": "HB",
+      "category": "fixture",
+      "dfu": 0,
+      "wsfu": { "cold": 2.5, "hot": 0, "total": 2.5 },
+      "flushValve": false,
+      "providesHotWater": false,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": null,
+      "minDrainSize": null,
+      "needsHotWater": false,
+      "needsGas": false,
+      "roughLaborHours": 1,
+      "trimLaborHours": 0.25,
+      "fixtureAllowance": 0,
+      "roughKit": [
+        { "materialId": "hose-bibb-frostfree", "qty": 1 }
+      ],
+      "trimKit": [],
+      "roughIn": [
+        { "id": "bibb-height", "label": "Bibb height", "reference": "Finished grade or floor to outlet CL", "min": 12, "target": 18, "max": 36 }
+      ]
+    },
+    {
+      "id": "wh-gas-50",
+      "label": "Water heater, gas tank 50 gal",
+      "shortLabel": "WH-G",
+      "category": "equipment",
+      "dfu": 0,
+      "wsfu": { "cold": 0, "hot": 0, "total": 0 },
+      "flushValve": false,
+      "providesHotWater": true,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": null,
+      "minDrainSize": null,
+      "needsHotWater": false,
+      "needsGas": true,
+      "roughLaborHours": 1.5,
+      "trimLaborHours": 3,
+      "fixtureAllowance": 1650,
+      "roughKit": [
+        { "materialId": "shutoff-ball-3-4", "qty": 1 },
+        { "materialId": "wh-pan", "qty": 1 }
+      ],
+      "trimKit": [
+        { "materialId": "gas-stop-flex", "qty": 1 },
+        { "materialId": "wh-expansion-tank", "qty": 1 },
+        { "materialId": "tp-discharge", "qty": 1 },
+        { "materialId": "wh-connector", "qty": 2 }
+      ],
+      "roughIn": []
+    },
+    {
+      "id": "wh-electric-50",
+      "label": "Water heater, electric tank 50 gal",
+      "shortLabel": "WH-E",
+      "category": "equipment",
+      "dfu": 0,
+      "wsfu": { "cold": 0, "hot": 0, "total": 0 },
+      "flushValve": false,
+      "providesHotWater": true,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": null,
+      "minDrainSize": null,
+      "needsHotWater": false,
+      "needsGas": false,
+      "roughLaborHours": 1.5,
+      "trimLaborHours": 2.5,
+      "fixtureAllowance": 1100,
+      "roughKit": [
+        { "materialId": "shutoff-ball-3-4", "qty": 1 },
+        { "materialId": "wh-pan", "qty": 1 }
+      ],
+      "trimKit": [
+        { "materialId": "wh-expansion-tank", "qty": 1 },
+        { "materialId": "tp-discharge", "qty": 1 },
+        { "materialId": "wh-connector", "qty": 2 }
+      ],
+      "roughIn": []
+    },
+    {
+      "id": "wh-tankless-gas",
+      "label": "Water heater, gas tankless",
+      "shortLabel": "WH-T",
+      "category": "equipment",
+      "dfu": 0,
+      "wsfu": { "cold": 0, "hot": 0, "total": 0 },
+      "flushValve": false,
+      "providesHotWater": true,
+      "defaultFurnishedBy": "worth",
+      "minTrapSize": null,
+      "minDrainSize": null,
+      "needsHotWater": false,
+      "needsGas": true,
+      "roughLaborHours": 2.5,
+      "trimLaborHours": 3.5,
+      "fixtureAllowance": 2800,
+      "roughKit": [
+        { "materialId": "shutoff-ball-3-4", "qty": 2 }
+      ],
+      "trimKit": [
+        { "materialId": "tankless-isolation-valves", "qty": 1 },
+        { "materialId": "gas-stop-flex", "qty": 1 },
+        { "materialId": "tp-discharge", "qty": 1 },
+        { "materialId": "condensate-neutralizer", "qty": 1 }
+      ],
+      "roughIn": []
+    }
+  ]
+}

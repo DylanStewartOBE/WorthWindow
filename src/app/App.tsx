@@ -67,6 +67,7 @@ import type {
 } from "../domain/types";
 import { createBlankElevationInput, createBlankJob, noDoorSeedInput, pairDoorSeedInput, seedJob } from "../data/seed";
 import { createRepository } from "../persistence/database";
+import { PlumbingApp } from "../plumbing/PlumbingApp";
 import {
   downloadBlob,
   generateJobDrawingPackagePdf,
@@ -170,14 +171,7 @@ export function App() {
   }
 
   if (productMode === "plumbing") {
-    return (
-      <TradeWorkspaceApp
-        eyebrow="Plumbing quoting"
-        title="Plumbing"
-        summary="Fixture counts, rough-in notes, allowances, and quote outputs will live in a plumbing-specific engine."
-        onBackToProducts={() => setProductMode("landing")}
-      />
-    );
+    return <PlumbingApp onBackToProducts={() => setProductMode("landing")} />;
   }
 
   if (productMode === "wine-room") {
@@ -1146,7 +1140,7 @@ function ProductLanding({ onSelectProduct }: { onSelectProduct: (mode: ProductMo
             <span className="product-choice-icon"><Droplets size={24} /></span>
             <span>
               <strong>Plumbing</strong>
-              <small>Fixture counts, rough-in notes, allowances, and quote outputs in their own workspace.</small>
+              <small>Fixture counts, pipe runs, rough-in field checks, material takeoffs, and quotes.</small>
             </span>
             <ChevronRight size={20} />
           </button>

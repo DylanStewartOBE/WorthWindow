@@ -1,0 +1,178 @@
+{
+  "id": "worth-plumbing-piping",
+  "name": "Worth Plumbing Piping Rules",
+  "version": "0.1.0",
+  "source": "Hanger spacing from IPC Table 308.5 (horizontal). Building drain capacity from IPC Table 710.1(1) at 1/4 in/ft. Demand from IPC Appendix E Table E103.3(3). Unit costs and labor units are budget placeholders; replace them with Worth supplier pricing and crew history before quoting.",
+  "wastePercent": 10,
+  "systems": [
+    { "system": "sanitary", "label": "Sanitary / waste", "fittingsPer100Ft": 18 },
+    { "system": "vent", "label": "Vent", "fittingsPer100Ft": 14 },
+    { "system": "cold", "label": "Domestic cold water", "fittingsPer100Ft": 22 },
+    { "system": "hot", "label": "Domestic hot water", "fittingsPer100Ft": 22, "insulationMaterialId": "insulation-pipe" },
+    { "system": "hot-return", "label": "Hot water return", "fittingsPer100Ft": 18, "insulationMaterialId": "insulation-pipe" },
+    { "system": "gas", "label": "Fuel gas", "fittingsPer100Ft": 16 },
+    { "system": "storm", "label": "Storm", "fittingsPer100Ft": 10 },
+    { "system": "condensate", "label": "Condensate", "fittingsPer100Ft": 15, "insulationMaterialId": "insulation-pipe" }
+  ],
+  "pipeMaterials": [
+    {
+      "id": "pvc-dwv",
+      "label": "PVC Sch 40 DWV",
+      "allowedSystems": ["sanitary", "vent", "storm", "condensate"],
+      "stickLengthFt": 20,
+      "hangerSpacingFt": 4,
+      "hangerMaterialId": "hanger-plastic",
+      "sizes": [
+        { "size": 0.75, "costPerFoot": 0.55, "laborHoursPerFoot": 0.04, "fittingCost": 0.8, "laborHoursPerFitting": 0.12 },
+        { "size": 1, "costPerFoot": 0.75, "laborHoursPerFoot": 0.045, "fittingCost": 1.1, "laborHoursPerFitting": 0.14 },
+        { "size": 1.5, "costPerFoot": 1.1, "laborHoursPerFoot": 0.06, "fittingCost": 2.5, "laborHoursPerFitting": 0.2 },
+        { "size": 2, "costPerFoot": 1.45, "laborHoursPerFoot": 0.07, "fittingCost": 3.5, "laborHoursPerFitting": 0.25 },
+        { "size": 3, "costPerFoot": 2.9, "laborHoursPerFoot": 0.09, "fittingCost": 8, "laborHoursPerFitting": 0.33 },
+        { "size": 4, "costPerFoot": 4.1, "laborHoursPerFoot": 0.11, "fittingCost": 14, "laborHoursPerFitting": 0.4 },
+        { "size": 6, "costPerFoot": 9.5, "laborHoursPerFoot": 0.16, "fittingCost": 45, "laborHoursPerFitting": 0.6 }
+      ]
+    },
+    {
+      "id": "abs-dwv",
+      "label": "ABS DWV",
+      "allowedSystems": ["sanitary", "vent", "storm"],
+      "stickLengthFt": 20,
+      "hangerSpacingFt": 4,
+      "hangerMaterialId": "hanger-plastic",
+      "sizes": [
+        { "size": 1.5, "costPerFoot": 1.2, "laborHoursPerFoot": 0.06, "fittingCost": 2.75, "laborHoursPerFitting": 0.2 },
+        { "size": 2, "costPerFoot": 1.6, "laborHoursPerFoot": 0.07, "fittingCost": 3.75, "laborHoursPerFitting": 0.25 },
+        { "size": 3, "costPerFoot": 3.1, "laborHoursPerFoot": 0.09, "fittingCost": 8.5, "laborHoursPerFitting": 0.33 },
+        { "size": 4, "costPerFoot": 4.4, "laborHoursPerFoot": 0.11, "fittingCost": 15, "laborHoursPerFitting": 0.4 }
+      ]
+    },
+    {
+      "id": "ci-nohub",
+      "label": "Cast iron no-hub",
+      "allowedSystems": ["sanitary", "vent", "storm"],
+      "stickLengthFt": 10,
+      "hangerSpacingFt": 5,
+      "hangerMaterialId": "hanger-ci",
+      "sizes": [
+        { "size": 2, "costPerFoot": 9, "laborHoursPerFoot": 0.12, "fittingCost": 18, "laborHoursPerFitting": 0.35 },
+        { "size": 3, "costPerFoot": 12.5, "laborHoursPerFoot": 0.15, "fittingCost": 28, "laborHoursPerFitting": 0.45 },
+        { "size": 4, "costPerFoot": 16, "laborHoursPerFoot": 0.18, "fittingCost": 40, "laborHoursPerFitting": 0.55 },
+        { "size": 6, "costPerFoot": 30, "laborHoursPerFoot": 0.25, "fittingCost": 95, "laborHoursPerFitting": 0.8 }
+      ]
+    },
+    {
+      "id": "copper-l",
+      "label": "Copper Type L",
+      "allowedSystems": ["cold", "hot", "hot-return"],
+      "stickLengthFt": 20,
+      "hangerSpacingFt": 6,
+      "largeHangerSpacingFt": 10,
+      "largeSizeFrom": 1.5,
+      "hangerMaterialId": "hanger-copper",
+      "sizes": [
+        { "size": 0.5, "costPerFoot": 4.2, "laborHoursPerFoot": 0.08, "fittingCost": 3.5, "laborHoursPerFitting": 0.2 },
+        { "size": 0.75, "costPerFoot": 6.8, "laborHoursPerFoot": 0.09, "fittingCost": 6.5, "laborHoursPerFitting": 0.25 },
+        { "size": 1, "costPerFoot": 9.5, "laborHoursPerFoot": 0.1, "fittingCost": 11, "laborHoursPerFitting": 0.3 },
+        { "size": 1.25, "costPerFoot": 13, "laborHoursPerFoot": 0.12, "fittingCost": 17, "laborHoursPerFitting": 0.35 },
+        { "size": 1.5, "costPerFoot": 16.5, "laborHoursPerFoot": 0.13, "fittingCost": 24, "laborHoursPerFitting": 0.4 },
+        { "size": 2, "costPerFoot": 26, "laborHoursPerFoot": 0.15, "fittingCost": 42, "laborHoursPerFitting": 0.5 }
+      ]
+    },
+    {
+      "id": "pex-a",
+      "label": "PEX-A (coil)",
+      "allowedSystems": ["cold", "hot", "hot-return"],
+      "stickLengthFt": 100,
+      "hangerSpacingFt": 2.67,
+      "hangerMaterialId": "hanger-pex",
+      "sizes": [
+        { "size": 0.5, "costPerFoot": 0.75, "laborHoursPerFoot": 0.025, "fittingCost": 4.5, "laborHoursPerFitting": 0.08 },
+        { "size": 0.75, "costPerFoot": 1.25, "laborHoursPerFoot": 0.03, "fittingCost": 7, "laborHoursPerFitting": 0.1 },
+        { "size": 1, "costPerFoot": 2.1, "laborHoursPerFoot": 0.035, "fittingCost": 12, "laborHoursPerFitting": 0.12 },
+        { "size": 1.25, "costPerFoot": 3.6, "laborHoursPerFoot": 0.04, "fittingCost": 22, "laborHoursPerFitting": 0.15 }
+      ]
+    },
+    {
+      "id": "cpvc",
+      "label": "CPVC CTS",
+      "allowedSystems": ["cold", "hot", "hot-return"],
+      "stickLengthFt": 10,
+      "hangerSpacingFt": 3,
+      "largeHangerSpacingFt": 4,
+      "largeSizeFrom": 1.25,
+      "hangerMaterialId": "hanger-plastic",
+      "sizes": [
+        { "size": 0.5, "costPerFoot": 0.9, "laborHoursPerFoot": 0.04, "fittingCost": 1.2, "laborHoursPerFitting": 0.12 },
+        { "size": 0.75, "costPerFoot": 1.4, "laborHoursPerFoot": 0.045, "fittingCost": 1.8, "laborHoursPerFitting": 0.14 },
+        { "size": 1, "costPerFoot": 2.2, "laborHoursPerFoot": 0.05, "fittingCost": 3, "laborHoursPerFitting": 0.16 }
+      ]
+    },
+    {
+      "id": "steel-gas",
+      "label": "Black steel Sch 40 (gas)",
+      "allowedSystems": ["gas"],
+      "stickLengthFt": 21,
+      "hangerSpacingFt": 8,
+      "largeHangerSpacingFt": 10,
+      "largeSizeFrom": 1.25,
+      "hangerMaterialId": "hanger-steel",
+      "sizes": [
+        { "size": 0.5, "costPerFoot": 4.5, "laborHoursPerFoot": 0.12, "fittingCost": 6, "laborHoursPerFitting": 0.35 },
+        { "size": 0.75, "costPerFoot": 5.5, "laborHoursPerFoot": 0.13, "fittingCost": 8, "laborHoursPerFitting": 0.4 },
+        { "size": 1, "costPerFoot": 7.5, "laborHoursPerFoot": 0.15, "fittingCost": 12, "laborHoursPerFitting": 0.5 },
+        { "size": 1.25, "costPerFoot": 10, "laborHoursPerFoot": 0.17, "fittingCost": 18, "laborHoursPerFitting": 0.55 },
+        { "size": 1.5, "costPerFoot": 12, "laborHoursPerFoot": 0.19, "fittingCost": 24, "laborHoursPerFitting": 0.6 },
+        { "size": 2, "costPerFoot": 16, "laborHoursPerFoot": 0.22, "fittingCost": 36, "laborHoursPerFitting": 0.75 }
+      ]
+    },
+    {
+      "id": "csst",
+      "label": "CSST (gas)",
+      "allowedSystems": ["gas"],
+      "stickLengthFt": 250,
+      "hangerSpacingFt": 6,
+      "hangerMaterialId": "hanger-csst",
+      "sizes": [
+        { "size": 0.5, "costPerFoot": 3.2, "laborHoursPerFoot": 0.03, "fittingCost": 32, "laborHoursPerFitting": 0.4 },
+        { "size": 0.75, "costPerFoot": 4.6, "laborHoursPerFoot": 0.035, "fittingCost": 45, "laborHoursPerFitting": 0.45 },
+        { "size": 1, "costPerFoot": 7.2, "laborHoursPerFoot": 0.04, "fittingCost": 70, "laborHoursPerFitting": 0.5 }
+      ]
+    }
+  ],
+  "buildingDrainAtQuarterInch": [
+    { "size": 1.25, "maxDfu": 1 },
+    { "size": 1.5, "maxDfu": 3 },
+    { "size": 2, "maxDfu": 21 },
+    { "size": 2.5, "maxDfu": 24 },
+    { "size": 3, "maxDfu": 42 },
+    { "size": 4, "maxDfu": 216 },
+    { "size": 5, "maxDfu": 480 },
+    { "size": 6, "maxDfu": 840 },
+    { "size": 8, "maxDfu": 1920 }
+  ],
+  "demand": [
+    { "wsfu": 1, "gpmFlushTank": 3, "gpmFlushValve": 0 },
+    { "wsfu": 2, "gpmFlushTank": 5, "gpmFlushValve": 0 },
+    { "wsfu": 3, "gpmFlushTank": 6.5, "gpmFlushValve": 0 },
+    { "wsfu": 4, "gpmFlushTank": 8, "gpmFlushValve": 0 },
+    { "wsfu": 5, "gpmFlushTank": 9.4, "gpmFlushValve": 15 },
+    { "wsfu": 6, "gpmFlushTank": 10.7, "gpmFlushValve": 17.4 },
+    { "wsfu": 7, "gpmFlushTank": 11.8, "gpmFlushValve": 19.8 },
+    { "wsfu": 8, "gpmFlushTank": 12.8, "gpmFlushValve": 22.2 },
+    { "wsfu": 9, "gpmFlushTank": 13.7, "gpmFlushValve": 24.6 },
+    { "wsfu": 10, "gpmFlushTank": 14.6, "gpmFlushValve": 27 },
+    { "wsfu": 12, "gpmFlushTank": 16, "gpmFlushValve": 28.6 },
+    { "wsfu": 15, "gpmFlushTank": 17.5, "gpmFlushValve": 31 },
+    { "wsfu": 20, "gpmFlushTank": 19.6, "gpmFlushValve": 35 },
+    { "wsfu": 25, "gpmFlushTank": 21.5, "gpmFlushValve": 38 },
+    { "wsfu": 30, "gpmFlushTank": 23.3, "gpmFlushValve": 42 },
+    { "wsfu": 40, "gpmFlushTank": 26.3, "gpmFlushValve": 46 },
+    { "wsfu": 50, "gpmFlushTank": 29.1, "gpmFlushValve": 50 },
+    { "wsfu": 60, "gpmFlushTank": 32, "gpmFlushValve": 54 },
+    { "wsfu": 80, "gpmFlushTank": 38, "gpmFlushValve": 61.2 },
+    { "wsfu": 100, "gpmFlushTank": 43.5, "gpmFlushValve": 67.5 },
+    { "wsfu": 150, "gpmFlushTank": 55, "gpmFlushValve": 79 },
+    { "wsfu": 200, "gpmFlushTank": 65, "gpmFlushValve": 90 },
+    { "wsfu": 250, "gpmFlushTank": 75, "gpmFlushValve": 101 }
+  ]
+}

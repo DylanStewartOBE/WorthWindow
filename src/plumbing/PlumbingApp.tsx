@@ -24,7 +24,6 @@ import {
 import { useEffect, useMemo, useRef, useState } from "react";
 import { defaultBranding } from "../config/options";
 import { getNextRevisionNumber } from "../domain/revision";
-import { downloadBlob } from "../pdf/pdfGenerator";
 import { defaultPlumbingConfig, pipeSystemOptions, runLocationOptions } from "./config";
 import {
   createAllowance,
@@ -63,6 +62,7 @@ import {
   roughInStatusLabel
 } from "./pdf";
 import {
+  ConfirmButton,
   FeetField,
   InchField,
   Metric,
@@ -74,6 +74,7 @@ import {
   Stepper,
   TextField
 } from "./ui/fields";
+import { prepareFileSaving, saveFile } from "./ui/saveFile";
 import "./plumbing.css";
 
 const steps = [
@@ -106,6 +107,8 @@ export function PlumbingApp({ onBackToProducts }: { onBackToProducts: () => void
   const takeoff = useMemo(() => buildPlumbingTakeoff(job, config), [job, config]);
   const quote = useMemo(() => calculatePlumbingQuote(job, takeoff, config.pricing), [job, takeoff, config.pricing]);
   const fixtureMap = useMemo(() => new Map(config.fixtureLibrary.fixtures.map((fixture) => [fixture.id, fixture])), [config]);
+
+  useEffect(prepareFileSaving, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -179,7 +182,6 @@ export function PlumbingApp({ onBackToProducts }: { onBackToProducts: () => void
   };
 
   const deleteJob = async () => {
-    if (!window.confirm(`Delete ${job.name}? Saved revisions stay in local storage but the working job is removed.`)) return;
     const deletedId = job.id;
     const remaining = jobs.filter((candidate) => candidate.id !== deletedId);
     // Switch away first so a pending autosave of the deleted job is cancelled.
@@ -202,7 +204,6 @@ export function PlumbingApp({ onBackToProducts }: { onBackToProducts: () => void
   };
 
   const restoreRevision = (revision: PlumbingRevision) => {
-    if (!window.confirm(`Replace the working copy with revision ${revision.number}?`)) return;
     setJob({ ...normalizePlumbingJob(revision.snapshot), id: job.id, updatedAt: new Date().toISOString() });
     setStatus(`Restored revision ${revision.number}`);
   };
@@ -225,8 +226,8 @@ export function PlumbingApp({ onBackToProducts }: { onBackToProducts: () => void
           return;
         }
       }
-      downloadBlob(blob, fileName);
-      setStatus(`Downloaded ${fileName}`);
+      const outcome = await saveFile(blob, fileName);
+      setStatus(outcome === "saved" ? `Saved ${fileName}` : "Save cancelled");
     } catch (error) {
       if (error instanceof DOMException && error.name === "AbortError") return;
       setStatus(`Export failed: ${error instanceof Error ? error.message : String(error)}`);
@@ -506,9 +507,9 @@ function JobStep({
             {job.status === "active" ? <Archive size={16} /> : <ArchiveRestore size={16} />}
             {job.status === "active" ? "Archive" : "Restore"}
           </button>
-          <button type="button" className="secondary-button pl-danger" onClick={onDeleteJob}>
-            <Trash2 size={16} /> Delete
-          </button>
+          <ConfirmButton className="secondary-button pl-danger" confirmLabel="Tap again to delete" onConfirm={onDeleteJob}>
+            <Trash2 size={16} /> Delete job
+          </ConfirmButton>
         </div>
       </section>
     </>
@@ -567,11 +568,6 @@ function FixturesStep({
     });
 
   const removeArea = (area: PlumbingArea) => {
-    const linkedRuns = job.runs.filter((run) => run.areaId === area.id).length;
-    const message = linkedRuns
-      ? `Remove ${area.name}? Its ${linkedRuns} pipe run${linkedRuns === 1 ? "" : "s"} and field checks are removed too.`
-      : `Remove ${area.name}?`;
-    if (!window.confirm(message)) return;
     updateJob((current) => ({
       ...current,
       areas: current.areas.filter((candidate) => candidate.id !== area.id),
@@ -712,9 +708,15 @@ function FixturesStep({
                 <button type="button" className="text-button" onClick={() => duplicateArea(area)}>
                   <Copy size={15} /> Duplicate
                 </button>
-                <button type="button" className="text-button pl-danger-text" onClick={() => removeArea(area)}>
+                <ConfirmButton
+                  className="text-button pl-danger-text"
+                  confirmLabel={
+                    job.runs.some((run) => run.areaId === area.id) ? "Tap again: removes its runs too" : "Tap again to remove"
+                  }
+                  onConfirm={() => removeArea(area)}
+                >
                   <Trash2 size={15} /> Remove
-                </button>
+                </ConfirmButton>
               </div>
             </div>
           </section>
@@ -1356,9 +1358,9 @@ function QuoteStep({
                 <strong>Rev {revision.number}</strong>
                 <small>{new Date(revision.createdAt).toLocaleString()}</small>
               </span>
-              <button type="button" className="text-button" onClick={() => onRestoreRevision(revision)}>
+              <ConfirmButton className="text-button" confirmLabel="Tap again to restore" onConfirm={() => onRestoreRevision(revision)}>
                 <History size={15} /> Restore
-              </button>
+              </ConfirmButton>
             </div>
           ))}
         </div>

@@ -160,7 +160,9 @@ const defaultCornerConfig: CornerConfig = {
 };
 
 export function App() {
-  const [productMode, setProductMode] = useState<ProductMode>("landing");
+  const [productMode, setProductMode] = useState<ProductMode>(() =>
+    typeof window !== "undefined" && window.location.hash === "#plumbing" ? "plumbing" : "landing"
+  );
 
   if (productMode === "window-wall") {
     return <WindowWallApp onBackToProducts={() => setProductMode("landing")} />;

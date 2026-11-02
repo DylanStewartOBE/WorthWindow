@@ -292,3 +292,45 @@ export function Metric({
     </div>
   );
 }
+
+/**
+ * Two-tap confirmation for destructive actions. Works where browser confirm dialogs are blocked
+ * and avoids modal pop-ups on a phone.
+ */
+export function ConfirmButton({
+  className,
+  confirmLabel,
+  onConfirm,
+  children
+}: {
+  className: string;
+  confirmLabel: string;
+  onConfirm: () => void;
+  children: ReactNode;
+}) {
+  const [armed, setArmed] = useState(false);
+
+  useEffect(() => {
+    if (!armed) return;
+    const timer = window.setTimeout(() => setArmed(false), 4000);
+    return () => window.clearTimeout(timer);
+  }, [armed]);
+
+  return (
+    <button
+      type="button"
+      className={`${className}${armed ? " pl-armed" : ""}`}
+      onClick={() => {
+        if (armed) {
+          setArmed(false);
+          onConfirm();
+        } else {
+          setArmed(true);
+        }
+      }}
+      onBlur={() => setArmed(false)}
+    >
+      {armed ? confirmLabel : children}
+    </button>
+  );
+}
